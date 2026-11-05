@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppSettings {
+  id        Int      @id @default(1)
+  ownerPin  String?  // 4-digit PIN for System 3 Boss Desk
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id             Int       @id @default(autoincrement())
+  name           String    // e.g. "Cash in Hand (गल्ला)", "SBI Current Account", "UPI QR"
+  type           String    @default("CASH") // CASH | BANK | UPI | OTHER
+  accountNumber  String?   // optional
+  openingBalance Int       @default(0) // paise
+  isDefault      Boolean   @default(false)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  payments       Payment[]
+  expenses       Expense[]
+  purchases      Purchase[]
+  sales          Sale[]
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String
+  name         String
+  role         String    // OWNER | MARKET_ENTRY
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  purchases    Purchase[]
+  sales        Sale[]
+  payments     Payment[]
+  wastages     Wastage[]
+  expenses     Expense[]
+  auditLogs    AuditLog[]
+}
+
+model Vegetable {
+  id        Int      @id @default(autoincrement())
+  nameEn    String
+  nameHi    String
+  unit      String   @default("kg") // kg, quintal, bunch, piece, crate
+  category  String?  // Root, Leafy, Fruit, Herbs, Others
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  wastages      Wastage[]
+}
+
+model Seller {
+  id             Int       @id @default(autoincrement())
+  name           String
+  phone          String?
+  village        String?
+  type           String    @default("Farmer") // Farmer | Mandi Trader
+  isOwnFarmer    Boolean   @default(false)
+  notes          String?
+  openingBalance Int       @default(0) // in paise (what we owe them initially)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  purchases Purchase[]
+  payments  Payment[]
+}
+
+model Buyer {
+  id             Int       @id @default(autoincrement())
+  name           String
+  contactPerson  String?
+  phone          String?
+  address        String?
+  notes          String?
+  openingBalance Int       @default(0) // in paise (what they owe us initially)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sales    Sale[]
+  payments Payment[]
+}
+
+model Purchase {
+  id              Int       @id @default(autoincrement())
+  date            DateTime
+  sellerId        Int
+  transport       Int       @default(0) // total transport paise
+  transportType   String    @default("FLAT") // FLAT | PER_UNIT
+  transportRate   Int       @default(0) // paise per unit (e.g. 2500 for ₹25)
+  transportUnit   String?   // sack, crate, kg, quintal, etc.
+  transportQty    Float     @default(0)
+  transporterName String?   // name or vehicle number
+  transportPaid   Boolean   @default(true)
+  labour          Int       @default(0) // paise
+  commission      Int       @default(0) // paise
+  paidNow         Int       @default(0) // paise - amount paid at time of purchase
+  paymentMode     String?   // Cash, UPI, Bank, Cheque, Other
+  accountId       Int?      // Linked bank/cash account
+  notes           String?
+  createdBy       Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  seller  Seller   @relation(fields: [sellerId], references: [id])
+  user    User     @relation(fields: [createdBy], references: [id])
+  account Account? @relation(fields: [accountId], references: [id])
+  items   PurchaseItem[]
+}
+
+model PurchaseItem {
+  id          Int    @id @default(autoincrement())
+  purchaseId  Int
+  vegetableId Int
+  quantity    Float
+  unit        String
+  rate        Int    // paise per unit
+  lineTotal   Int    // paise (quantity * rate)
+
+  purchase  Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  vegetable Vegetable @relation(fields: [vegetableId], references: [id])
+}
+
+model Sale {
+  id               Int       @id @default(autoincrement())
+  date             DateTime
+  buyerId          Int
+  deductionAmount  Int       @default(0) // paise
+  deductionReason  String?
+  receivedNow      Int       @default(0) // paise
+  paymentMode      String?
+  accountId        Int?      // Linked bank/cash account
+  notes            String?
+  createdBy        Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  buyer   Buyer    @relation(fields: [buyerId], references: [id])
+  user    User     @relation(fields: [createdBy], references: [id])
+  account Account? @relation(fields: [accountId], references: [id])
+  items   SaleItem[]
+}
+
+model SaleItem {
+  id          Int    @id @default(autoincrement())
+  saleId      Int
+  vegetableId Int
+  quantity    Float
+  unit        String
+  rate        Int    // paise per unit
+  lineTotal   Int    // paise
+
+  sale      Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  vegetable Vegetable @relation(fields: [vegetableId], references: [id])
+}
+
+model Payment {
+  id            Int       @id @default(autoincrement())
+  date          DateTime
+  direction     String    // PAID_TO_SELLER | RECEIVED_FROM_BUYER
+  sellerId      Int?
+  buyerId       Int?
+  amount        Int       // paise
+  mode          String    // Cash, UPI, Bank Transfer, Cheque, Other
+  accountId     Int?      // Linked bank/cash account
+  reference     String?
+  linkedEntryId Int?      // optional link to purchase/sale id
+  notes         String?
+  createdBy     Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  seller  Seller?  @relation(fields: [sellerId], references: [id])
+  buyer   Buyer?   @relation(fields: [buyerId], references: [id])
+  user    User     @relation(fields: [createdBy], references: [id])
+  account Account? @relation(fields: [accountId], references: [id])
+}
+
+model Wastage {
+  id          Int       @id @default(autoincrement())
+  date        DateTime
+  vegetableId Int
+  quantity    Float
+  reason      String    // Rotten, Damaged, Shrinkage, Other
+  notes       String?
+  createdBy   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  vegetable Vegetable @relation(fields: [vegetableId], references: [id])
+  user      User      @relation(fields: [createdBy], references: [id])
+}
+
+model Expense {
+  id        Int       @id @default(autoincrement())
+  date      DateTime
+  category  String    // Transport, Labour, Rent, Fuel, Other
+  amount    Int       // paise
+  accountId Int?      // Linked bank/cash account
+  notes     String?
+  createdBy Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User     @relation(fields: [createdBy], references: [id])
+  account Account? @relation(fields: [accountId], references: [id])
+}
+
+model AuditLog {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  action    String    // CREATE, UPDATE, DELETE
+  entity    String    // Purchase, Sale, Payment, Wastage, Expense, etc.
+  entityId  Int
+  before    String?   // JSON string of old values
+  after     String?   // JSON string of new values
+  timestamp DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

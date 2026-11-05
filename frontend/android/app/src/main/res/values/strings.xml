@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sabzi Khata</string>
+    <string name="title_activity_main">Sabzi Khata</string>
+    <string name="package_name">com.hussainfoods.sabzikhata</string>
+    <string name="custom_url_scheme">com.hussainfoods.sabzikhata</string>
+</resources>
