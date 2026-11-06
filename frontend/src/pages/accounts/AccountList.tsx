@@ -45,9 +45,12 @@ export const AccountList: React.FC = () => {
   // Passbook Modal
   const [passbookModalOpen, setPassbookModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [passbookFilter, setPassbookFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
   const [passbookData, setPassbookData] = useState<{
     openingBalance: number;
     currentBalance: number;
+    totalInflow?: number;
+    totalOutflow?: number;
     transactions: AccountTransaction[];
   } | null>(null);
   const [loadingPassbook, setLoadingPassbook] = useState(false);
@@ -127,6 +130,7 @@ export const AccountList: React.FC = () => {
     setSelectedAccount(acc);
     setPassbookModalOpen(true);
     setLoadingPassbook(true);
+    setPassbookFilter('ALL');
     try {
       const res = await getAccountPassbook(acc.id);
       setPassbookData(res);
@@ -456,19 +460,58 @@ export const AccountList: React.FC = () => {
           <LoadingSpinner />
         ) : passbookData ? (
           <div className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-200">
+            <div className="p-4 bg-linear-to-r from-gray-900 to-slate-800 text-white rounded-2xl flex items-center justify-between shadow-xs">
               <div>
-                <span className="text-xs text-gray-500">Current Balance:</span>
-                <div className="text-2xl font-bold text-gray-900 mt-0.5">
-                  <CurrencyDisplay amount={passbookData.currentBalance} colorize />
+                <span className="text-xs text-gray-400 block uppercase tracking-wider">Current Live Balance:</span>
+                <div className="text-2xl font-extrabold text-white mt-0.5">
+                  <CurrencyDisplay amount={passbookData.currentBalance} />
+                </div>
+                <span className="text-[11px] text-gray-400 block mt-0.5">
+                  Opening: ₹{Math.round(passbookData.openingBalance / 100).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="text-right space-y-1">
+                <div className="text-xs">
+                  <span className="text-emerald-400 font-bold">Total In (+ IN): </span>
+                  <span className="font-extrabold text-white">
+                    ₹{Math.round((passbookData.totalInflow || 0) / 100).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="text-xs">
+                  <span className="text-rose-400 font-bold">Total Out (- OUT): </span>
+                  <span className="font-extrabold text-white">
+                    ₹{Math.round((passbookData.totalOutflow || 0) / 100).toLocaleString('en-IN')}
+                  </span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-500">Opening Balance:</span>
-                <div className="text-sm font-semibold text-gray-700 mt-0.5">
-                  <CurrencyDisplay amount={passbookData.openingBalance} />
-                </div>
-              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setPassbookFilter('ALL')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'ALL' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                सभी ({passbookData.transactions.length})
+              </button>
+              <button
+                onClick={() => setPassbookFilter('IN')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'IN' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                आवक / जमा (+ IN)
+              </button>
+              <button
+                onClick={() => setPassbookFilter('OUT')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'OUT' ? 'bg-white text-rose-700 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                निकासी / भुगतान (- OUT)
+              </button>
             </div>
 
             <div className="border border-gray-100 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
@@ -482,31 +525,41 @@ export const AccountList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {passbookData.transactions.length === 0 ? (
+                  {passbookData.transactions.filter((tx) =>
+                    passbookFilter === 'ALL' ? true : tx.type === passbookFilter
+                  ).length === 0 ? (
                     <tr>
                       <td colSpan={4} className="p-6 text-center text-gray-400">
-                        No transactions recorded for this account yet.
+                        No transactions recorded for this filter.
                       </td>
                     </tr>
                   ) : (
-                    passbookData.transactions.map((tx, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="px-3 py-2.5 whitespace-nowrap text-gray-500">
-                          {formatDate(tx.date, 'dd MMM yyyy')}
-                        </td>
-                        <td className="px-3 py-2.5 font-medium text-gray-900">
-                          {tx.description}
-                        </td>
-                        <td className={`px-3 py-2.5 text-right font-bold whitespace-nowrap ${
-                          tx.type === 'IN' ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {tx.type === 'IN' ? '+' : '-'}<CurrencyDisplay amount={tx.amount} />
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-bold text-gray-900 whitespace-nowrap">
-                          <CurrencyDisplay amount={tx.balance} />
-                        </td>
-                      </tr>
-                    ))
+                    passbookData.transactions
+                      .filter((tx) => (passbookFilter === 'ALL' ? true : tx.type === passbookFilter))
+                      .map((tx: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50/50">
+                          <td className="px-3 py-2.5 whitespace-nowrap text-gray-500">
+                            {formatDate(tx.date, 'dd MMM yyyy')}
+                          </td>
+                          <td className="px-3 py-2.5 font-medium text-gray-900">
+                            <div>{tx.description}</div>
+                            {tx.category && (
+                              <span className="text-[10px] text-gray-400">{tx.category}</span>
+                            )}
+                          </td>
+                          <td
+                            className={`px-3 py-2.5 text-right font-bold whitespace-nowrap ${
+                              tx.type === 'IN' ? 'text-emerald-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {tx.type === 'IN' ? '+' : '-'}
+                            <CurrencyDisplay amount={tx.amount} />
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-bold text-gray-900 whitespace-nowrap">
+                            <CurrencyDisplay amount={tx.balance} />
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>

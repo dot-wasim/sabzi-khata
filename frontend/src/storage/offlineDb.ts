@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   SALES: 'sk_offline_sales',
   PURCHASES: 'sk_offline_purchases',
   ACCOUNTS: 'sk_offline_accounts',
+  PAYMENTS: 'sk_offline_payments',
   SETTINGS: 'sk_offline_settings',
   USER: 'sk_offline_user',
   TOKEN: 'token',
@@ -205,34 +206,79 @@ export const offlineDb = {
     }
 
     // Process each sale as debit and received amount as credit
-    sales.forEach((s) => {
+    const salesEntries = sales.map((s) => {
       const saleNet = Math.max(
         0,
         (s.items || []).reduce((sum: number, it: any) => sum + (it.lineTotal || 0), 0) - (s.deductionAmount || 0)
       );
-      runningBalance += saleNet;
-      entries.push({
+      return {
         date: s.date,
+        rawDate: new Date(s.date).getTime(),
         type: 'SALE',
         notes: (s.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
         debit: saleNet,
         credit: 0,
-        balance: runningBalance,
         referenceId: s.id,
-      });
+        receivedNow: s.receivedNow || 0,
+        paymentMode: s.paymentMode || 'नकद',
+      };
+    });
 
+    // Also include payments from this buyer
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS).filter(
+      (p) => p.buyerId === id && p.direction === 'IN'
+    );
+    const paymentEntries = payments.map((p) => ({
+      date: p.date,
+      rawDate: new Date(p.date).getTime(),
+      type: 'PAYMENT',
+      notes: `खाता जमा (${p.paymentMode || 'नकद'}) ${p.notes ? '- ' + p.notes : ''}`,
+      debit: 0,
+      credit: p.amount || 0,
+      referenceId: p.id,
+      receivedNow: 0,
+      paymentMode: p.paymentMode || 'नकद',
+    }));
+
+    // Merge chronologically
+    const allChronological: any[] = [];
+    salesEntries.forEach((s) => {
+      allChronological.push({
+        date: s.date,
+        rawDate: s.rawDate,
+        type: 'SALE',
+        notes: s.notes,
+        debit: s.debit,
+        credit: 0,
+        referenceId: s.referenceId,
+      });
       if (s.receivedNow > 0) {
-        runningBalance -= s.receivedNow;
-        entries.push({
+        allChronological.push({
           date: s.date,
+          rawDate: s.rawDate + 1, // slightly after sale
           type: 'PAYMENT',
-          notes: `जमा (${s.paymentMode || 'नकद'})`,
+          notes: `जमा (${s.paymentMode})`,
           debit: 0,
           credit: s.receivedNow,
-          balance: runningBalance,
-          referenceId: s.id,
+          referenceId: s.referenceId,
         });
       }
+    });
+
+    paymentEntries.forEach((p) => allChronological.push(p));
+    allChronological.sort((a, b) => a.rawDate - b.rawDate);
+
+    allChronological.forEach((entry) => {
+      runningBalance = runningBalance + entry.debit - entry.credit;
+      entries.push({
+        date: entry.date,
+        type: entry.type,
+        notes: entry.notes,
+        debit: entry.debit,
+        credit: entry.credit,
+        balance: runningBalance,
+        referenceId: entry.referenceId,
+      });
     });
 
     return {
@@ -368,9 +414,232 @@ export const offlineDb = {
     return newSeller;
   },
 
-  // Accounts
+  // Accounts & Passbooks
   getAccounts: async () => {
-    return getCollection<any>(STORAGE_KEYS.ACCOUNTS);
+    const accounts = getCollection<any>(STORAGE_KEYS.ACCOUNTS);
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES);
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+
+    return accounts.map((acc) => {
+      // Calculate dynamic inflow & outflow
+      const saleInflows = sales
+        .filter((s) => Number(s.accountId) === acc.id)
+        .reduce((sum, s) => sum + (s.receivedNow || 0), 0);
+      const paymentInflows = payments
+        .filter((p) => Number(p.accountId) === acc.id && p.direction === 'IN')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      const inflows = saleInflows + paymentInflows;
+
+      const purchaseOutflows = purchases
+        .filter((p) => Number(p.accountId) === acc.id)
+        .reduce((sum, p) => sum + (p.paidNow || 0), 0);
+      const paymentOutflows = payments
+        .filter((p) => Number(p.accountId) === acc.id && p.direction === 'OUT')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      const outflows = purchaseOutflows + paymentOutflows;
+
+      const liveBalance = (acc.openingBalance || 0) + inflows - outflows;
+
+      return {
+        ...acc,
+        liveBalance,
+        currentBalance: liveBalance,
+        totalInflow: inflows,
+        totalOutflow: outflows,
+      };
+    });
+  },
+
+  getAccountPassbook: async (id: number) => {
+    const accounts = getCollection<any>(STORAGE_KEYS.ACCOUNTS);
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES);
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+    const buyers = getCollection<any>(STORAGE_KEYS.BUYERS);
+    const sellers = getCollection<any>(STORAGE_KEYS.SELLERS);
+
+    const account = accounts.find((a) => a.id === id);
+    if (!account) throw new Error('Account not found');
+
+    let runningBalance = account.openingBalance || 0;
+
+    // 1. Sales receipts (IN)
+    const accSales = sales
+      .filter((s) => Number(s.accountId) === id && s.receivedNow > 0)
+      .map((s) => {
+        const b = buyers.find((x) => x.id === s.buyerId);
+        return {
+          date: s.date,
+          description: `बिक्री बिल जमा (${b?.name || 'ग्राहक'})`,
+          type: 'IN',
+          amount: s.receivedNow,
+          category: 'बिक्री / Sale Receipt',
+          rawDate: new Date(s.date).getTime(),
+          referenceId: `SALE-#${s.id}`,
+          partyName: b?.name || 'ग्राहक',
+          notes: s.paymentMode ? `मोड: ${s.paymentMode}` : '',
+        };
+      });
+
+    // 2. Mandi purchases payments (OUT)
+    const accPurchases = purchases
+      .filter((p) => Number(p.accountId) === id && p.paidNow > 0)
+      .map((p) => {
+        const sel = sellers.find((x) => x.id === p.sellerId);
+        return {
+          date: p.date,
+          description: `मंडी खरीद भुगतान (${sel?.name || 'किसान'})`,
+          type: 'OUT',
+          amount: p.paidNow,
+          category: 'खरीद / Mandi Purchase',
+          rawDate: new Date(p.date).getTime(),
+          referenceId: `PUR-#${p.id}`,
+          partyName: sel?.name || 'किसान',
+          notes: p.paymentMode ? `मोड: ${p.paymentMode}` : '',
+        };
+      });
+
+    // 3. Standalone payments (Inward collection / Outward payment)
+    const accPayments = payments
+      .filter((p) => Number(p.accountId) === id && p.amount > 0)
+      .map((p) => {
+        const b = p.buyerId ? buyers.find((x) => x.id === p.buyerId) : null;
+        const sel = p.sellerId ? sellers.find((x) => x.id === p.sellerId) : null;
+        const isEntryIn = p.direction === 'IN';
+        return {
+          date: p.date,
+          description: isEntryIn
+            ? `जमा पर्ची / बकाया वसूली (${b?.name || 'ग्राहक'})`
+            : `देनदारी भुगतान (${sel?.name || 'किसान'})`,
+          type: isEntryIn ? 'IN' : 'OUT',
+          amount: p.amount,
+          category: isEntryIn ? 'ग्राहक जमा / Collection' : 'विक्रेता भुगतान / Payout',
+          rawDate: new Date(p.date).getTime(),
+          referenceId: `PAY-#${p.id}`,
+          partyName: b?.name || sel?.name || 'पार्टी',
+          notes: p.notes,
+        };
+      });
+
+    const combined = [...accSales, ...accPurchases, ...accPayments].sort((a, b) => a.rawDate - b.rawDate);
+    const transactions: any[] = [];
+
+    combined.forEach((tx) => {
+      if (tx.type === 'IN') {
+        runningBalance += tx.amount;
+      } else {
+        runningBalance -= tx.amount;
+      }
+      transactions.push({
+        date: tx.date,
+        description: tx.description,
+        type: tx.type,
+        amount: tx.amount,
+        category: tx.category,
+        balance: runningBalance,
+        referenceId: tx.referenceId,
+        partyName: tx.partyName,
+        notes: tx.notes,
+      });
+    });
+
+    const totalInflow = combined.filter((t) => t.type === 'IN').reduce((s, t) => s + t.amount, 0);
+    const totalOutflow = combined.filter((t) => t.type === 'OUT').reduce((s, t) => s + t.amount, 0);
+
+    return {
+      account: { ...account, liveBalance: runningBalance, currentBalance: runningBalance, totalInflow, totalOutflow },
+      openingBalance: account.openingBalance || 0,
+      currentBalance: runningBalance,
+      totalInflow,
+      totalOutflow,
+      transactions: transactions.reverse(),
+    };
+  },
+
+  // Standalone Payments & Collections
+  getPayments: async (params?: any) => {
+    let payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+    const buyers = getCollection<any>(STORAGE_KEYS.BUYERS);
+    const sellers = getCollection<any>(STORAGE_KEYS.SELLERS);
+    const accounts = getCollection<any>(STORAGE_KEYS.ACCOUNTS);
+
+    payments = payments.map((p) => ({
+      ...p,
+      buyer: p.buyerId ? buyers.find((b) => b.id === p.buyerId) : undefined,
+      seller: p.sellerId ? sellers.find((s) => s.id === p.sellerId) : undefined,
+      account: p.accountId ? accounts.find((a) => a.id === p.accountId) : undefined,
+    }));
+
+    if (params?.direction) {
+      payments = payments.filter((p) => p.direction === params.direction);
+    }
+    if (params?.buyerId) {
+      payments = payments.filter((p) => p.buyerId === Number(params.buyerId));
+    }
+    if (params?.sellerId) {
+      payments = payments.filter((p) => p.sellerId === Number(params.sellerId));
+    }
+
+    return {
+      payments: payments.reverse(),
+      pagination: { total: payments.length },
+    };
+  },
+
+  createPayment: async (data: any) => {
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+    const buyers = getCollection<any>(STORAGE_KEYS.BUYERS);
+    const sellers = getCollection<any>(STORAGE_KEYS.SELLERS);
+    const accounts = getCollection<any>(STORAGE_KEYS.ACCOUNTS);
+
+    const amount = Number(data.amount) || 0;
+    const direction = data.direction || (data.buyerId ? 'IN' : 'OUT');
+    const accountId = Number(data.accountId) || 1;
+
+    const newPayment = {
+      id: Date.now(),
+      date: data.date || new Date().toISOString(),
+      direction,
+      amount,
+      paymentMode: data.paymentMode || 'Cash',
+      accountId,
+      buyerId: data.buyerId ? Number(data.buyerId) : undefined,
+      sellerId: data.sellerId ? Number(data.sellerId) : undefined,
+      notes: data.notes || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    payments.push(newPayment);
+    saveCollection(STORAGE_KEYS.PAYMENTS, payments);
+
+    // If IN (received from buyer), reduce buyer due & increase account balance
+    if (direction === 'IN' && data.buyerId) {
+      const buyer = buyers.find((b) => b.id === Number(data.buyerId));
+      if (buyer) {
+        buyer.currentDue = Math.max(0, (buyer.currentDue || 0) - amount);
+        saveCollection(STORAGE_KEYS.BUYERS, buyers);
+      }
+      const acc = accounts.find((a) => a.id === accountId);
+      if (acc) {
+        acc.currentBalance = (acc.currentBalance || 0) + amount;
+        saveCollection(STORAGE_KEYS.ACCOUNTS, accounts);
+      }
+    } else if (direction === 'OUT' && data.sellerId) {
+      // If OUT (paid to seller), reduce seller due & decrease account balance
+      const seller = sellers.find((s) => s.id === Number(data.sellerId));
+      if (seller) {
+        seller.currentDue = Math.max(0, (seller.currentDue || 0) - amount);
+        saveCollection(STORAGE_KEYS.SELLERS, sellers);
+      }
+      const acc = accounts.find((a) => a.id === accountId);
+      if (acc) {
+        acc.currentBalance = (acc.currentBalance || 0) - amount;
+        saveCollection(STORAGE_KEYS.ACCOUNTS, accounts);
+      }
+    }
+
+    return newPayment;
   },
 
   // Sales (Sell Desk)

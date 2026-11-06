@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../api/dashboard';
+import { getAccountPassbook } from '../api/accounts';
 import { CurrencyDisplay } from '../components/CurrencyDisplay';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { Modal } from '../components/Modal';
 import { toInputDate, formatDate } from '../utils/date';
 import { useBossAuth } from '../context/BossAuthContext';
 import {
@@ -13,7 +15,13 @@ import {
   ChevronRight,
   ShieldCheck,
   Calendar,
-  Sparkles
+  Sparkles,
+  Wallet,
+  QrCode,
+  ArrowDownLeft,
+  ArrowUpRight,
+  History,
+  X
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -23,6 +31,13 @@ export const Dashboard: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const { lockBoss, openPinModal } = useBossAuth();
   const navigate = useNavigate();
+
+  // Account Passbook Modal in Boss section
+  const [passbookModalOpen, setPassbookModalOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [passbookData, setPassbookData] = useState<any>(null);
+  const [loadingPassbook, setLoadingPassbook] = useState(false);
+  const [passbookFilter, setPassbookFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
   const fetchDashboard = async (dateStr: string) => {
     setLoading(true);
@@ -39,6 +54,21 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboard(selectedDate);
   }, [selectedDate]);
+
+  const openAccountPassbook = async (acc: any) => {
+    setSelectedAccount(acc);
+    setPassbookModalOpen(true);
+    setLoadingPassbook(true);
+    setPassbookFilter('ALL');
+    try {
+      const res = await getAccountPassbook(acc.id);
+      setPassbookData(res);
+    } catch (err) {
+      console.error('Failed to load account passbook:', err);
+    } finally {
+      setLoadingPassbook(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -125,7 +155,7 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Big Profit Hero Card (Navy Blue as in prototype) */}
+        {/* Big Profit Hero Card */}
         <div className="bg-[#22304A] text-white rounded-2xl p-5 shadow-md">
           <div className="text-xs text-[#C9D2E6]">आज का मुनाफ़ा / Today's profit</div>
           <div className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
@@ -167,25 +197,39 @@ export const Dashboard: React.FC = () => {
           </NavLink>
         </div>
 
-        {/* Live Bank Balances Bar */}
+        {/* Live Bank Balances Bar with direct Passbook access */}
         {data?.accounts && data.accounts.length > 0 && (
-          <div className="bg-white border border-[#E3DFD0] rounded-xl p-3.5 shadow-2xs">
-            <div className="flex justify-between items-center mb-2">
-              <b className="text-sm text-[#1B2A1F]">बैंक व गल्ला स्थिति / Liquid Balances</b>
-              <NavLink to="/accounts" className="text-xs font-bold text-[#1F6B3A] hover:underline">
-                पासबुक &rarr;
+          <div className="bg-white border border-[#E3DFD0] rounded-xl p-3.5 shadow-2xs space-y-2.5">
+            <div className="flex justify-between items-center">
+              <div>
+                <b className="text-sm text-[#1B2A1F] block">खाता पासबुक व गल्ला / Accounts Ledger</b>
+                <span className="text-[11px] text-gray-400">अलग-अलग बैंक व नकद लेन-देन का लेजर</span>
+              </div>
+              <NavLink to="/accounts" className="text-xs font-bold text-[#1F6B3A] hover:underline flex items-center gap-1">
+                <span>विस्तार</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </NavLink>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
+
+            <div className="grid grid-cols-3 gap-2">
               {data.accounts.map((acc: any) => (
-                <div key={acc.id} className="p-2 bg-[#F6F4EC] rounded-lg">
-                  <span className="text-[10px] text-gray-500 block truncate">
-                    {acc.type === 'CASH' ? 'गल्ला (Cash)' : acc.type === 'BANK' ? 'SBI Bank' : 'UPI QR'}
+                <button
+                  key={acc.id}
+                  onClick={() => openAccountPassbook(acc)}
+                  className="p-2.5 bg-[#F6F4EC] hover:bg-[#eae6d5] active:scale-98 transition-all rounded-xl border border-[#E3DFD0] text-left flex flex-col justify-between"
+                >
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 block truncate">
+                      {acc.type === 'CASH' ? 'गल्ला (Cash)' : acc.type === 'BANK' ? 'SBI Bank' : 'UPI QR'}
+                    </span>
+                    <b className="text-xs text-[#1B2A1F] block mt-1">
+                      <CurrencyDisplay amount={acc.currentBalance || 0} />
+                    </b>
+                  </div>
+                  <span className="text-[9px] text-[#1F6B3A] font-bold mt-2 block">
+                    लेजर देखें &rarr;
                   </span>
-                  <b className="text-xs text-[#1B2A1F] block mt-0.5">
-                    <CurrencyDisplay amount={acc.currentBalance || 0} />
-                  </b>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -297,6 +341,143 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Account Passbook / Payment Ledger Modal inside Boss Section */}
+      <Modal
+        isOpen={passbookModalOpen}
+        onClose={() => setPassbookModalOpen(false)}
+        title={selectedAccount ? `${selectedAccount.name} - लेजर पासबुक` : 'खाता लेजर'}
+        maxWidth="lg"
+      >
+        {loadingPassbook ? (
+          <LoadingSpinner />
+        ) : passbookData ? (
+          <div className="space-y-4">
+            {/* Account Balance Summary Header */}
+            <div className="p-4 bg-linear-to-r from-[#22304A] to-[#1B2A1F] text-white rounded-2xl flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-xs text-gray-300 uppercase tracking-wider block">
+                  वर्तमान बैलेंस (Live Balance)
+                </span>
+                <div className="text-2xl font-extrabold mt-0.5 text-white">
+                  <CurrencyDisplay amount={passbookData.currentBalance} />
+                </div>
+                <span className="text-[11px] text-gray-300 block mt-0.5">
+                  शुरुआती बैलेंस: ₹{Math.round(passbookData.openingBalance / 100).toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div className="text-right space-y-1">
+                <div className="text-xs">
+                  <span className="text-emerald-300 font-bold">कुल आवक (+ IN): </span>
+                  <span className="font-extrabold text-white">
+                    ₹{Math.round((passbookData.totalInflow || 0) / 100).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="text-xs">
+                  <span className="text-rose-300 font-bold">कुल निकासी (- OUT): </span>
+                  <span className="font-extrabold text-white">
+                    ₹{Math.round((passbookData.totalOutflow || 0) / 100).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Tabs for IN / OUT / ALL */}
+            <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setPassbookFilter('ALL')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'ALL' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                सभी ({passbookData.transactions.length})
+              </button>
+              <button
+                onClick={() => setPassbookFilter('IN')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'IN' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                आवक / जमा (+ IN)
+              </button>
+              <button
+                onClick={() => setPassbookFilter('OUT')}
+                className={`flex-1 py-1.5 rounded-lg transition-all ${
+                  passbookFilter === 'OUT' ? 'bg-white text-rose-700 shadow-2xs' : 'text-gray-500'
+                }`}
+              >
+                निकासी / भुगतान (- OUT)
+              </button>
+            </div>
+
+            {/* Transactions List */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
+              <div className="divide-y divide-gray-100">
+                {passbookData.transactions.filter((tx: any) =>
+                  passbookFilter === 'ALL' ? true : tx.type === passbookFilter
+                ).length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-xs">
+                    इस खाते में कोई लेन-देन नहीं है।
+                  </div>
+                ) : (
+                  passbookData.transactions
+                    .filter((tx: any) => (passbookFilter === 'ALL' ? true : tx.type === passbookFilter))
+                    .map((tx: any, idx: number) => (
+                      <div key={idx} className="p-3 hover:bg-gray-50 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] ${
+                              tx.type === 'IN'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {tx.type === 'IN' ? '+IN' : '-OUT'}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900 leading-tight">
+                              {tx.description}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5">
+                              <span>{formatDate(tx.date)}</span>
+                              {tx.category && (
+                                <>
+                                  <span>•</span>
+                                  <span>{tx.category}</span>
+                                </>
+                              )}
+                              {tx.referenceId && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-mono">{tx.referenceId}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div
+                            className={`font-extrabold ${
+                              tx.type === 'IN' ? 'text-emerald-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {tx.type === 'IN' ? '+' : '-'}
+                            <CurrencyDisplay amount={tx.amount} />
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            बैलेंस: ₹{Math.round(tx.balance / 100).toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

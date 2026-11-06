@@ -20,7 +20,8 @@ export const Login: React.FC = () => {
     try {
       const data = await apiLogin(username.trim(), password);
       login(data.token, data.user);
-      navigate(data.user.role === 'OWNER' ? '/' : '/purchases');
+      // Navigate directly to Sell Desk (Buyer activities)
+      navigate('/sales');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Invalid username or password');
     } finally {

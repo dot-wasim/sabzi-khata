@@ -33,8 +33,12 @@ export async function getAccountPassbook(id: number): Promise<{
   currentBalance: number;
   transactions: AccountTransaction[];
 }> {
-  const res = await apiClient.get(`/accounts/${id}/passbook`);
-  return res.data;
+  try {
+    const res = await apiClient.get(`/accounts/${id}/passbook`);
+    return res.data;
+  } catch (err) {
+    return offlineDb.getAccountPassbook(id);
+  }
 }
 
 export async function transferAccount(data: {
