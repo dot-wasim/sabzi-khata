@@ -93,11 +93,19 @@ initDefaultData();
 export const offlineDb = {
   // Auth
   login: async (username: string, _password: string) => {
+    const uLower = (username || '').toLowerCase().trim();
+    const isFather = uLower.includes('father') || uLower.includes('walid') || uLower.includes('abbu') || uLower.includes('papa');
+    const isMarket = uLower === 'market';
+
     const user = {
-      id: 1,
-      username: username || 'owner',
-      name: 'Hussain Foods (Owner)',
-      role: 'OWNER',
+      id: isFather ? 2 : isMarket ? 3 : 1,
+      username: username || (isFather ? 'father' : 'owner'),
+      name: isFather
+        ? 'पिता जी (Father - Hussain Foods)'
+        : isMarket
+        ? 'मंडी ऑपरेटर (Market Counter)'
+        : 'Hussain Foods (मालिक / Owner)',
+      role: isFather || isMarket ? ('MARKET_ENTRY' as const) : ('OWNER' as const),
     };
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     localStorage.setItem(STORAGE_KEYS.TOKEN, 'offline-token-' + Date.now());
@@ -361,31 +369,77 @@ export const offlineDb = {
       });
     }
 
-    purchases.forEach((p) => {
+    // Purchases entries
+    const purchasesEntries = purchases.map((p) => {
       const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
-      runningBalance += goods;
-      entries.push({
+      return {
         date: p.date,
+        rawDate: new Date(p.date).getTime(),
         type: 'PURCHASE',
         notes: (p.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
         credit: goods,
         debit: 0,
-        balance: runningBalance,
         referenceId: p.id,
-      });
+        paidNow: p.paidNow || 0,
+        paymentMode: p.paymentMode || 'नकद',
+      };
+    });
 
+    // Standalone payments to this seller
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS).filter(
+      (pay) => pay.sellerId === id && pay.direction === 'OUT'
+    );
+    const paymentEntries = payments.map((pay) => ({
+      date: pay.date,
+      rawDate: new Date(pay.date).getTime(),
+      type: 'PAYMENT',
+      notes: `खाता भुगतान (${pay.paymentMode || 'नकद'}) ${pay.notes ? '- ' + pay.notes : ''}`,
+      credit: 0,
+      debit: pay.amount || 0,
+      referenceId: pay.id,
+      paidNow: 0,
+      paymentMode: pay.paymentMode || 'नकद',
+    }));
+
+    // Merge chronologically
+    const allChronological: any[] = [];
+    purchasesEntries.forEach((p) => {
+      allChronological.push({
+        date: p.date,
+        rawDate: p.rawDate,
+        type: 'PURCHASE',
+        notes: p.notes,
+        credit: p.credit,
+        debit: 0,
+        referenceId: p.referenceId,
+      });
       if (p.paidNow > 0) {
-        runningBalance -= p.paidNow;
-        entries.push({
+        allChronological.push({
           date: p.date,
+          rawDate: p.rawDate + 1,
           type: 'PAYMENT',
-          notes: `भुगतान (${p.paymentMode || 'नकद'})`,
+          notes: `भुगतान (${p.paymentMode})`,
           credit: 0,
           debit: p.paidNow,
-          balance: runningBalance,
-          referenceId: p.id,
+          referenceId: p.referenceId,
         });
       }
+    });
+
+    paymentEntries.forEach((pay) => allChronological.push(pay));
+    allChronological.sort((a, b) => a.rawDate - b.rawDate);
+
+    allChronological.forEach((entry) => {
+      runningBalance = runningBalance + entry.credit - entry.debit;
+      entries.push({
+        date: entry.date,
+        type: entry.type,
+        notes: entry.notes,
+        credit: entry.credit,
+        debit: entry.debit,
+        balance: runningBalance,
+        referenceId: entry.referenceId,
+      });
     });
 
     return {

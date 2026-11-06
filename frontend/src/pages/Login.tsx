@@ -29,9 +29,18 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
+  const performDirectLogin = async (u: string, p: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await apiLogin(u, p);
+      login(data.token, data.user);
+      navigate('/sales');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -96,21 +105,33 @@ export const Login: React.FC = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-xs text-gray-500 mb-3">Quick Login for Testing:</p>
-          <div className="flex gap-2 justify-center">
+          <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">
+            1-क्लिक सीधा लॉगिन (Quick Login):
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <button
               type="button"
-              onClick={() => handleQuickLogin('owner', 'owner123')}
-              className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200"
+              disabled={loading}
+              onClick={() => performDirectLogin('father', 'father123')}
+              className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-extrabold text-xs border border-blue-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
             >
-              Father (Owner)
+              <span>👨‍🦳 पिता जी (Father Login)</span>
             </button>
             <button
               type="button"
-              onClick={() => handleQuickLogin('market', 'market123')}
-              className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 border border-gray-200"
+              disabled={loading}
+              onClick={() => performDirectLogin('owner', 'owner123')}
+              className="py-2.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 font-extrabold text-xs border border-purple-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
             >
-              Brother (Market Entry)
+              <span>👑 मालिक (Owner / Boss)</span>
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => performDirectLogin('market', 'market123')}
+              className="py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-extrabold text-xs border border-emerald-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
+            >
+              <span>🛒 मंडी ऑपरेटर (Operator)</span>
             </button>
           </div>
         </div>

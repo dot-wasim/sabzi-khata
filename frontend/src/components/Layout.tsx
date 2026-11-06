@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useBossAuth } from '../context/BossAuthContext';
 import {
@@ -21,14 +21,28 @@ import {
   Unlock,
   PlusCircle,
   MoreHorizontal,
-  X
+  X,
+  ArrowRightLeft
 } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const { isBossUnlocked, lockBoss, openPinModal } = useBossAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+
+  const isBuyerSide = location.pathname.startsWith('/sales') || location.pathname.startsWith('/buyers');
+  const isSellerSide = location.pathname.startsWith('/purchases') || location.pathname.startsWith('/sellers');
+  const isBossSide =
+    location.pathname.startsWith('/boss') ||
+    location.pathname === '/' ||
+    location.pathname.startsWith('/accounts') ||
+    location.pathname.startsWith('/stock') ||
+    location.pathname.startsWith('/reports') ||
+    location.pathname.startsWith('/payments') ||
+    location.pathname.startsWith('/wastage') ||
+    location.pathname.startsWith('/expenses');
 
   const isOwner = user?.role === 'OWNER';
 
@@ -58,8 +72,8 @@ export const Layout: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-100 shrink-0 h-screen sticky top-0">
-        {/* Brand */}
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+        {/* Brand & Top-Left Desk Switcher */}
+        <div className="p-4 border-b border-gray-100 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-xs">
               🥬
@@ -68,6 +82,32 @@ export const Layout: React.FC = () => {
               <h1 className="font-bold text-gray-900 text-base leading-tight">Sabzi Khata</h1>
               <p className="text-xs text-emerald-700 font-medium">Hussain Foods</p>
             </div>
+          </div>
+
+          {/* Quick Desk Switcher in Desktop Sidebar */}
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <button
+              onClick={() => navigate('/sales')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                isBuyerSide
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-blue-700'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Buyer (ग्राहक)</span>
+            </button>
+            <button
+              onClick={() => navigate('/purchases')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                isSellerSide
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-emerald-700'
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span>Seller (किसान)</span>
+            </button>
           </div>
         </div>
 
@@ -282,39 +322,59 @@ export const Layout: React.FC = () => {
         </nav>
       </aside>
 
-      {/* Mobile Top Header */}
-      <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-40 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-base">
-            🥬
-          </div>
-          <div>
-            <h1 className="font-bold text-gray-900 text-sm leading-none">Sabzi Khata</h1>
-            <p className="text-[11px] text-emerald-700 font-medium">{user?.name}</p>
-          </div>
+      {/* Mobile Top Header with Top-Left Desk Switcher & Logout */}
+      <header className="md:hidden bg-white border-b border-gray-200 px-3 py-2.5 sticky top-0 z-40 flex items-center justify-between gap-1 shadow-2xs">
+        {/* Top-Left: Desk Switcher between Buyer and Seller */}
+        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-xl border border-gray-200">
+          <button
+            onClick={() => navigate('/sales')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1 transition-all ${
+              isBuyerSide
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-gray-600 hover:text-blue-700'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Buyer (ग्राहक)</span>
+          </button>
+          <button
+            onClick={() => navigate('/purchases')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1 transition-all ${
+              isSellerSide
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-gray-600 hover:text-emerald-700'
+            }`}
+          >
+            <ShoppingCart className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Seller (किसान)</span>
+          </button>
         </div>
-        <div className="flex items-center gap-1.5">
+
+        {/* Top-Right: User & Boss Unlock & Logout */}
+        <div className="flex items-center gap-1">
           {isBossUnlocked ? (
             <button
               onClick={lockBoss}
-              className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg flex items-center gap-1 font-bold border border-emerald-200"
+              className="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-800 rounded-lg flex items-center gap-1 font-bold border border-emerald-200"
             >
-              <Unlock className="w-3.5 h-3.5" /> Boss
+              <Unlock className="w-3 h-3" /> Boss
             </button>
           ) : (
             <button
               onClick={() => openPinModal()}
-              className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg flex items-center gap-1 font-semibold"
+              className="text-[10px] px-2 py-1 bg-gray-100 text-gray-700 rounded-lg flex items-center gap-1 font-semibold"
             >
-              <Lock className="w-3.5 h-3.5" /> Boss
+              <Lock className="w-3 h-3 text-amber-600" /> Boss
             </button>
           )}
+
           <button
             onClick={handleLogout}
-            className="text-gray-400 hover:text-rose-600 p-1.5 rounded-lg"
-            title="Logout"
+            className="flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-extrabold border border-rose-200 transition-colors"
+            title="लॉग आउट करें (Logout)"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>लॉग आउट</span>
           </button>
         </div>
       </header>
@@ -324,17 +384,31 @@ export const Layout: React.FC = () => {
         <Outlet />
       </main>
 
-      {/* Mobile Bottom Navigation Bar (The 3 Desks) */}
+      {/* Mobile Bottom Navigation Bar: Instant Switching between Buyer Side, Seller Side & Boss Desk */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg">
-        <NavLink to="/sales" className={mobileBottomItemClass}>
+        <button
+          onClick={() => navigate('/sales')}
+          className={`flex flex-col items-center justify-center py-2 px-1 text-[11px] font-extrabold transition-all ${
+            isBuyerSide
+              ? 'text-blue-600 bg-blue-50/70 border-t-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
           <TrendingUp className="w-5 h-5 text-blue-600" />
-          <span className="mt-0.5">1. Sell (बिक्री)</span>
-        </NavLink>
+          <span className="mt-0.5">1. Buyer (ग्राहक)</span>
+        </button>
 
-        <NavLink to="/purchases" className={mobileBottomItemClass}>
+        <button
+          onClick={() => navigate('/purchases')}
+          className={`flex flex-col items-center justify-center py-2 px-1 text-[11px] font-extrabold transition-all ${
+            isSellerSide
+              ? 'text-emerald-600 bg-emerald-50/70 border-t-2 border-emerald-600'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
           <ShoppingCart className="w-5 h-5 text-emerald-600" />
-          <span className="mt-0.5">2. Buy (खरीद)</span>
-        </NavLink>
+          <span className="mt-0.5">2. Seller (किसान)</span>
+        </button>
 
         <button
           onClick={() => {
@@ -344,20 +418,26 @@ export const Layout: React.FC = () => {
               openPinModal(() => navigate('/boss'));
             }
           }}
-          className={`flex flex-col items-center justify-center py-1.5 px-2 text-[11px] font-bold ${
-            isBossUnlocked ? 'text-purple-700 font-extrabold' : 'text-gray-600'
+          className={`flex flex-col items-center justify-center py-2 px-1 text-[11px] font-extrabold transition-all ${
+            isBossSide
+              ? 'text-purple-700 bg-purple-50/70 border-t-2 border-purple-700'
+              : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          {isBossUnlocked ? <BarChart3 className="w-5 h-5 text-purple-600" /> : <Lock className="w-5 h-5 text-amber-600" />}
-          <span className="mt-0.5">3. Boss (लाभ)</span>
+          {isBossUnlocked ? (
+            <BarChart3 className="w-5 h-5 text-purple-600" />
+          ) : (
+            <Lock className="w-5 h-5 text-amber-600" />
+          )}
+          <span className="mt-0.5">3. Boss (मालिक)</span>
         </button>
 
         <button
-          onClick={() => setMoreSheetOpen(true)}
-          className="flex flex-col items-center justify-center py-1.5 px-2 text-[11px] font-bold text-gray-500 hover:text-gray-900"
+          onClick={handleLogout}
+          className="flex flex-col items-center justify-center py-2 px-1 text-[11px] font-extrabold text-rose-600 hover:text-rose-700"
         >
-          <MoreHorizontal className="w-5 h-5" />
-          <span className="mt-0.5">More</span>
+          <LogOut className="w-5 h-5 stroke-[2.2]" />
+          <span className="mt-0.5">लॉग आउट</span>
         </button>
       </nav>
 
