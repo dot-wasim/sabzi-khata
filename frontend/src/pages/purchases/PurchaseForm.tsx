@@ -56,6 +56,14 @@ export const PurchaseForm: React.FC = () => {
   const [paidTodayRupees, setPaidTodayRupees] = useState('2400');
   const [accountId, setAccountId] = useState<number | ''>('');
 
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [savedPurchaseSummary, setSavedPurchaseSummary] = useState<{
+    supplierName: string;
+    goodsTotal: number;
+    paidAmount: number;
+    stillOwed: number;
+  } | null>(null);
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -195,7 +203,13 @@ export const PurchaseForm: React.FC = () => {
       } else {
         await createPurchase(payload);
       }
-      navigate('/purchases');
+      setSavedPurchaseSummary({
+        supplierName: selectedSeller?.name || 'Supplier',
+        goodsTotal: payableToSupplierRupees,
+        paidAmount: paidTodayVal,
+        stillOwed: stillOwedRupees,
+      });
+      setShowSavedModal(true);
     } catch (err: any) {
       alert(`त्रुटि: ${err.message || 'खरीद दर्ज नहीं हो सकी'}`);
     } finally {
@@ -527,6 +541,64 @@ export const PurchaseForm: React.FC = () => {
       )}
 
       {/* Modals */}
+      {showSavedModal && savedPurchaseSummary && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#F6F7F2] border-2 border-[#1F6B45] rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-[#1F6B45] text-white rounded-full flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
+                ✓
+              </div>
+              <h2 className="text-lg font-bold text-[#1B2A1F]">खरीद सेव हो गई! (Purchase Saved)</h2>
+              <p className="text-xs text-gray-600">
+                {savedPurchaseSummary.supplierName} · {formatDate(date, 'd MMM yyyy')}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-3 border border-[#DDE3D6] space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">कुल माल (Payable Goods)</span>
+                <span className="font-semibold text-[#1B2A1F]">₹{savedPurchaseSummary.goodsTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">आज दिया (Paid Today)</span>
+                <span className="font-semibold text-emerald-700">₹{savedPurchaseSummary.paidAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between border-t border-[#DDE3D6] pt-1.5 font-bold">
+                <span className="text-gray-700">बाकी देना (Still Owed)</span>
+                <span className="text-[#B4540A] text-base">₹{savedPurchaseSummary.stillOwed.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavedModal(false);
+                  setSellerId('');
+                  setItems([{ vegetableId: 0, quantity: '', unit: 'kg', rateRupees: '' }]);
+                  setBadGoods([]);
+                  setPaidTodayRupees('0');
+                }}
+                className="flex-1 bg-[#1F6B45] hover:bg-[#185336] text-white font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                ➕ अगली खरीद (New Entry)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavedModal(false);
+                  navigate('/purchases');
+                }}
+                className="flex-1 bg-white hover:bg-gray-100 text-[#1B2A1F] border border-[#DDE3D6] font-semibold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                📋 खरीद लिस्ट (All Purchases)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sellerModalOpen && (
         <SellerModal
           isOpen={sellerModalOpen}

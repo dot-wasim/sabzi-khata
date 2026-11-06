@@ -49,6 +49,14 @@ export const SaleForm: React.FC = () => {
   const [nextBillNo, setNextBillNo] = useState<number>(1);
   const [savedSaleId, setSavedSaleId] = useState<number | null>(null);
   const [customerRecentEntries, setCustomerRecentEntries] = useState<any[]>([]);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [savedBillSummary, setSavedBillSummary] = useState<{
+    billNo: number | string;
+    customerName: string;
+    todayTotal: number;
+    balanceDue: number;
+    paidAmount: number;
+  } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -206,6 +214,16 @@ export const SaleForm: React.FC = () => {
         resultId = res.id;
         setSavedSaleId(res.id);
       }
+
+      setSavedBillSummary({
+        billNo: isEdit ? id : nextBillNo,
+        customerName: selectedBuyer?.name || 'Customer',
+        todayTotal: todayTotalRupees,
+        balanceDue: balanceDueRupees,
+        paidAmount: paidNowVal,
+      });
+      setShowSavedModal(true);
+
       return resultId || null;
     } catch (err: any) {
       alert(`त्रुटि: ${err.message || 'बिल सेव नहीं हो पाया'}`);
@@ -517,6 +535,79 @@ export const SaleForm: React.FC = () => {
       </button>
 
       {/* Modals */}
+      {showSavedModal && savedBillSummary && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#F6F7F2] border-2 border-[#1F6B45] rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-[#1F6B45] text-white rounded-full flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
+                ✓
+              </div>
+              <h2 className="text-lg font-bold text-[#1B2A1F]">बिल सेव हो गया! (Bill Saved)</h2>
+              <p className="text-xs text-gray-600">
+                Bill #{savedBillSummary.billNo} · {savedBillSummary.customerName}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-3 border border-[#DDE3D6] space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">आज का कुल (Today)</span>
+                <span className="font-semibold text-[#1B2A1F]">₹{savedBillSummary.todayTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">आज जमा (Paid Now)</span>
+                <span className="font-semibold text-emerald-700">₹{savedBillSummary.paidAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between border-t border-[#DDE3D6] pt-1.5 font-bold">
+                <span className="text-gray-700">कुल बाकी (Total Due)</span>
+                <span className="text-[#B4540A] text-base">₹{savedBillSummary.balanceDue.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavedModal(false);
+                  handleShareWhatsApp();
+                }}
+                className="w-full bg-[#25D366] hover:bg-[#20ba59] text-white font-bold py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-2 cursor-pointer text-sm"
+              >
+                <span>💬 WhatsApp पर पर्ची भेजें</span>
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSavedModal(false);
+                    // Reset form for next customer
+                    setBuyerId('');
+                    setItems([{ vegetableId: 0, quantity: '', unit: 'kg', rateRupees: '' }]);
+                    setPaidNowRupees('');
+                    setSavedSaleId(null);
+                    setNextBillNo((prev) => prev + 1);
+                  }}
+                  className="flex-1 bg-[#1F6B45] hover:bg-[#185336] text-white font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+                >
+                  ➕ अगला बिल (New Bill)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSavedModal(false);
+                    navigate('/sales');
+                  }}
+                  className="flex-1 bg-white hover:bg-gray-100 text-[#1B2A1F] border border-[#DDE3D6] font-semibold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+                >
+                  📋 बिल लिस्ट (All Bills)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {buyerModalOpen && (
         <BuyerModal
           isOpen={buyerModalOpen}
