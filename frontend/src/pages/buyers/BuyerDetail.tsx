@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBuyer, getBuyerLedger, updateBuyer } from '../../api/buyers';
+import { getVegetables } from '../../api/vegetables';
 import { createPayment } from '../../api/payments';
 import { BuyerModal } from './BuyerModal';
 import { formatDate } from '../../utils/date';
 import { paiseToRupees, rupeesToPaise } from '../../utils/currency';
+import { Vegetable } from '../../utils/types';
 
 export const BuyerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +15,8 @@ export const BuyerDetail: React.FC = () => {
 
   const [data, setData] = useState<any>(null);
   const [ledger, setLedger] = useState<any>(null);
+  const [vegetables, setVegetables] = useState<Vegetable[]>([]);
+  const [selectedBillDetail, setSelectedBillDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [showPaymentBox, setShowPaymentBox] = useState(false);
@@ -27,12 +31,14 @@ export const BuyerDetail: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [buyerRes, ledgerRes] = await Promise.all([
+      const [buyerRes, ledgerRes, vegRes] = await Promise.all([
         getBuyer(buyerId),
         getBuyerLedger(buyerId),
+        getVegetables(),
       ]);
       setData(buyerRes);
       setLedger(ledgerRes);
+      setVegetables(vegRes);
     } catch (err) {
       console.error('Failed to load buyer detail:', err);
     } finally {
@@ -286,16 +292,32 @@ export const BuyerDetail: React.FC = () => {
                 const isSale = entry.type === 'SALE';
                 const isOpening = entry.type === 'OPENING';
                 return (
-                  <tr key={idx} className="hover:bg-gray-50">
+                  <tr
+                    key={idx}
+                    onClick={() => {
+                      if (isSale) {
+                        setSelectedBillDetail(entry);
+                      }
+                    }}
+                    className={`transition-colors ${isSale ? 'cursor-pointer hover:bg-emerald-50/70' : 'hover:bg-gray-50'}`}
+                    title={isSale ? 'Tap to view bill items and calculation details' : undefined}
+                  >
                     <td className="px-3 py-2.5 font-semibold text-gray-700 whitespace-nowrap">
                       {formatDate(entry.date, 'd MMM')}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={isSale ? 'font-bold text-[#1F6B45]' : isOpening ? 'font-bold text-amber-700' : 'font-bold text-emerald-700'}>
-                        {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={isSale ? 'font-bold text-[#1F6B45]' : isOpening ? 'font-bold text-amber-700' : 'font-bold text-emerald-700'}>
+                          {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
+                        </span>
+                        {isSale && (
+                          <span className="text-[10px] bg-emerald-100 text-[#1F6B45] font-bold px-1.5 py-0.2 rounded">
+                            View 👁
+                          </span>
+                        )}
+                      </div>
                       {entry.notes && (
-                        <span className="text-[10px] text-gray-500 block truncate max-w-[110px]">
+                        <span className="text-[10px] text-gray-500 block truncate max-w-[120px]">
                           {entry.notes}
                         </span>
                       )}
@@ -321,10 +343,23 @@ export const BuyerDetail: React.FC = () => {
         ledger?.entries?.map((entry: any, idx: number) => {
           const isSale = entry.type === 'SALE';
           return (
-            <div key={idx} className="c">
+            <div
+              key={idx}
+              onClick={() => {
+                if (isSale) {
+                  setSelectedBillDetail(entry);
+                }
+              }}
+              className={`c transition-all ${isSale ? 'cursor-pointer hover:border-[#1F6B45]' : ''}`}
+            >
               <div className="r">
-                <span className="font-bold text-sm">
+                <span className="font-bold text-sm flex items-center gap-1.5">
                   {formatDate(entry.date, 'd MMM')} · {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
+                  {isSale && (
+                    <span className="text-[10px] bg-emerald-100 text-[#1F6B45] font-bold px-1.5 py-0.2 rounded">
+                      Items ▾
+                    </span>
+                  )}
                 </span>
                 <span className="d">
                   Due ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
@@ -332,7 +367,7 @@ export const BuyerDetail: React.FC = () => {
               </div>
               <div className="r text-xs">
                 <span className="m">
-                  {isSale ? 'Amount charged' : `Paid via ${entry.paymentMethod || 'cash'}`}
+                  {isSale ? 'Amount charged (Tap to view details)' : `Paid via ${entry.paymentMethod || 'cash'}`}
                 </span>
                 <b>
                   {entry.debit > 0
@@ -343,6 +378,151 @@ export const BuyerDetail: React.FC = () => {
             </div>
           );
         })
+      )}
+
+      {/* Bill Items & Breakdown Detail Modal */}
+      {selectedBillDetail && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#F6F7F2] border-2 border-[#1F6B45] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-[#DDE3D6] pb-3">
+              <div>
+                <span className="text-xs font-bold text-[#1F6B45] uppercase tracking-wider">Hussain Foods · Bill Details</span>
+                <h2 className="text-lg font-black text-[#1B2A1F]">
+                  {selectedBillDetail.referenceId} · {buyer?.name}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  तारीख: {formatDate(selectedBillDetail.date, 'd MMMM yyyy')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBillDetail(null)}
+                className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Produce Line Items */}
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-gray-700">सब्ज़ियों का विवरण (Vegetable Line Items):</span>
+              <div className="bg-white rounded-xl border border-[#DDE3D6] overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-[#E8EDE2] text-[#1B2A1F] font-bold">
+                    <tr>
+                      <th className="px-3 py-2">आइटम</th>
+                      <th className="px-2 py-2 text-center">वज़न / Unit</th>
+                      <th className="px-2 py-2 text-right">रेट</th>
+                      <th className="px-3 py-2 text-right">रकम</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#DDE3D6]">
+                    {selectedBillDetail.items && selectedBillDetail.items.length > 0 ? (
+                      selectedBillDetail.items.map((it: any, i: number) => {
+                        const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
+                        const nameEn = veg?.nameEn || 'Item';
+                        const nameHi = veg?.nameHi ? ` (${veg.nameHi})` : '';
+                        const rateRupees = paiseToRupees(it.rate || 0);
+                        const lineTotalRupees = paiseToRupees(it.lineTotal || (it.quantity * it.rate));
+
+                        return (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-semibold text-[#1B2A1F]">
+                              {nameEn}{nameHi}
+                            </td>
+                            <td className="px-2 py-2 text-center text-gray-600">
+                              {it.quantity} {it.unit || 'kg'}
+                            </td>
+                            <td className="px-2 py-2 text-right font-medium">
+                              ₹{rateRupees}
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-[#1B2A1F]">
+                              ₹{lineTotalRupees.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-3 text-center text-gray-500">
+                          {selectedBillDetail.notes || 'Details recorded under bill total'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Step-by-Step Ledger Math Calculation */}
+            <div className="bg-white rounded-xl p-3 border border-[#DDE3D6] space-y-2 text-xs">
+              <span className="font-bold text-gray-800 block border-b border-gray-100 pb-1">
+                बकाया का पूरा हिसाब (How Balance was Calculated):
+              </span>
+              
+              <div className="flex justify-between text-gray-600">
+                <span>आज का माल (Today's Sale Total)</span>
+                <span className="font-bold text-[#1B2A1F]">
+                  + ₹{paiseToRupees(selectedBillDetail.debit).toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              {selectedBillDetail.previousDue !== undefined && (
+                <div className="flex justify-between text-gray-600">
+                  <span>पिछला बकाया (Previous Due carried forward)</span>
+                  <span className="font-semibold text-gray-700">
+                    + ₹{paiseToRupees(selectedBillDetail.previousDue).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+
+              {selectedBillDetail.grandTotal !== undefined && (
+                <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-200 pt-1">
+                  <span>कुल योग (Grand Total)</span>
+                  <span>₹{paiseToRupees(selectedBillDetail.grandTotal).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {selectedBillDetail.receivedNow > 0 && (
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span>बिल के समय जमा (Paid Now)</span>
+                  <span>− ₹{paiseToRupees(selectedBillDetail.receivedNow).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between border-t border-[#DDE3D6] pt-1.5 font-black text-sm">
+                <span className="text-gray-800">इस बिल के बाद कुल बकाया (Balance After Bill)</span>
+                <span className="text-[#B4540A]">
+                  ₹{paiseToRupees(selectedBillDetail.runningBalance !== undefined ? selectedBillDetail.runningBalance : selectedBillDetail.balance).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBillDetail(null);
+                  if (selectedBillDetail.saleId) {
+                    navigate(`/sales/${selectedBillDetail.saleId}/edit`);
+                  }
+                }}
+                className="flex-1 bg-white hover:bg-gray-100 text-[#1F6B45] border border-[#1F6B45] font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                ✏️ बिल एडिट करें (Edit Bill)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedBillDetail(null)}
+                className="flex-1 bg-[#1F6B45] hover:bg-[#185336] text-white font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                बंद करें (Close)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Customer Modal */}

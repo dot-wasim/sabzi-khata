@@ -267,6 +267,8 @@ export const offlineDb = {
         (s.items || []).reduce((sum: number, it: any) => sum + (it.lineTotal || 0), 0) - (s.deductionAmount || 0)
       );
       return {
+        id: s.id,
+        saleId: s.id,
         date: s.date,
         rawDate: new Date(s.date).getTime(),
         type: 'SALE',
@@ -277,6 +279,11 @@ export const offlineDb = {
         credit: 0,
         receivedNow: s.receivedNow || 0,
         paymentMode: s.paymentMode || 'नकद',
+        items: s.items || [],
+        todayTotal: s.todayTotal !== undefined ? s.todayTotal : saleNet,
+        previousDue: s.previousDue,
+        grandTotal: s.grandTotal,
+        balanceDue: s.balanceDue,
       };
     });
 
@@ -329,6 +336,8 @@ export const offlineDb = {
     allChronological.forEach((entry) => {
       runningBalance = runningBalance + entry.debit - entry.credit;
       entries.push({
+        id: entry.id,
+        saleId: entry.saleId,
         date: entry.date,
         type: entry.type,
         referenceId: entry.referenceId,
@@ -338,6 +347,12 @@ export const offlineDb = {
         credit: entry.credit,
         balance: runningBalance,
         runningBalance: runningBalance,
+        items: entry.items,
+        todayTotal: entry.todayTotal,
+        previousDue: entry.previousDue,
+        grandTotal: entry.grandTotal,
+        balanceDue: entry.balanceDue,
+        paymentMode: entry.paymentMode,
       });
     });
 
@@ -453,15 +468,21 @@ export const offlineDb = {
     const purchasesEntries = purchases.map((p) => {
       const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
       return {
+        id: p.id,
+        purchaseId: p.id,
         date: p.date,
         rawDate: new Date(p.date).getTime(),
         type: 'PURCHASE',
         notes: (p.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
         credit: goods,
         debit: 0,
-        referenceId: p.id,
+        referenceId: p.id ? `Pur #${p.id}` : 'Purchase',
         paidNow: p.paidNow || 0,
         paymentMode: p.paymentMode || 'नकद',
+        items: p.items || [],
+        transport: p.transport || 0,
+        labour: p.labour || 0,
+        badGoods: p.badGoods || [],
       };
     });
 
@@ -512,6 +533,8 @@ export const offlineDb = {
     allChronological.forEach((entry) => {
       runningBalance = runningBalance + entry.credit - entry.debit;
       entries.push({
+        id: entry.id,
+        purchaseId: entry.purchaseId,
         date: entry.date,
         type: entry.type,
         notes: entry.notes,
@@ -519,6 +542,12 @@ export const offlineDb = {
         debit: entry.debit,
         balance: runningBalance,
         referenceId: entry.referenceId,
+        items: entry.items,
+        transport: entry.transport,
+        labour: entry.labour,
+        badGoods: entry.badGoods,
+        paidNow: entry.paidNow,
+        paymentMode: entry.paymentMode,
       });
     });
 
