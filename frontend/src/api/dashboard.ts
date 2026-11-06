@@ -17,13 +17,13 @@ export async function getDashboard(date?: string): Promise<{
     return {
       date: date || new Date().toISOString(),
       cards: {
-        todaySales: offlineRes.todaySales,
-        todayPurchases: offlineRes.todayPurchases,
-        todayWastage: 0,
-        todayExpenses: 0,
-        netProfit: offlineRes.netProfit,
-        totalBuyerDues: offlineRes.totalBuyerDues,
-        totalSellerDues: offlineRes.totalSellerDues,
+        boughtToday: offlineRes.todayPurchases,
+        soldToday: offlineRes.todaySales,
+        paidToday: 0,
+        receivedToday: 0,
+        totalPayable: offlineRes.totalSellerDues,
+        totalReceivable: offlineRes.totalBuyerDues,
+        todayProfit: offlineRes.netProfit,
       },
       breakdown: {
         byVegetable: [],

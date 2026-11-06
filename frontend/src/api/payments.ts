@@ -16,7 +16,8 @@ export async function createPayment(data: any): Promise<Payment> {
     const res = await apiClient.post('/payments', data);
     return res.data;
   } catch (err) {
-    return offlineDb.createPayment(data);
+    const res = await offlineDb.createPayment(data);
+    return res as unknown as Payment;
   }
 }
 

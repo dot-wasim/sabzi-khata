@@ -14,6 +14,7 @@ export interface Account {
   isDefault: boolean;
   active: boolean;
   liveBalance?: number;
+  currentBalance?: number;
   totalInflow?: number;
   totalOutflow?: number;
 }
@@ -62,6 +63,7 @@ export interface Buyer {
   openingBalance: number;
   active: boolean;
   currentBalance?: number;
+  currentDue?: number;
   totalSold?: number;
   totalReceived?: number;
 }
