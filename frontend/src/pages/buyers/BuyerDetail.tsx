@@ -420,9 +420,9 @@ export const BuyerDetail: React.FC = () => {
                   <tbody className="divide-y divide-[#DDE3D6]">
                     {selectedBillDetail.items && selectedBillDetail.items.length > 0 ? (
                       selectedBillDetail.items.map((it: any, i: number) => {
-                        const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
-                        const nameEn = veg?.nameEn || 'Item';
-                        const nameHi = veg?.nameHi ? ` (${veg.nameHi})` : '';
+                        const veg = it.vegetable || vegetables.find((v) => v.id === Number(it.vegetableId));
+                        const nameEn = it.nameEn || it.vegetableName || veg?.nameEn || (it.vegetable?.nameEn) || 'Item';
+                        const nameHi = it.nameHi || veg?.nameHi || (it.vegetable?.nameHi) ? ` (${it.nameHi || veg?.nameHi || it.vegetable?.nameHi})` : '';
                         const rateRupees = paiseToRupees(it.rate || 0);
                         const lineTotalRupees = paiseToRupees(it.lineTotal || (it.quantity * it.rate));
 
@@ -445,8 +445,19 @@ export const BuyerDetail: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={4} className="px-3 py-3 text-center text-gray-500">
-                          {selectedBillDetail.notes || 'Details recorded under bill total'}
+                        <td className="px-3 py-2.5 font-semibold text-[#1B2A1F]">
+                          {selectedBillDetail.notes ? 'सब्ज़ियों की खेप (Produce lot)' : 'सब्ज़ी (Vegetables)'}
+                        </td>
+                        <td className="px-2 py-2.5 text-center text-gray-600 font-semibold">
+                          {selectedBillDetail.notes || '—'}
+                        </td>
+                        <td className="px-2 py-2.5 text-right font-medium text-gray-600">
+                          {selectedBillDetail.notes && parseFloat(selectedBillDetail.notes)
+                            ? `₹${Math.round(paiseToRupees(selectedBillDetail.debit) / (parseFloat(selectedBillDetail.notes) || 1))}/kg`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold text-[#1B2A1F]">
+                          ₹{paiseToRupees(selectedBillDetail.debit).toLocaleString('en-IN')}
                         </td>
                       </tr>
                     )}
@@ -468,21 +479,27 @@ export const BuyerDetail: React.FC = () => {
                 </span>
               </div>
 
-              {selectedBillDetail.previousDue !== undefined && (
-                <div className="flex justify-between text-gray-600">
-                  <span>पिछला बकाया (Previous Due carried forward)</span>
-                  <span className="font-semibold text-gray-700">
-                    + ₹{paiseToRupees(selectedBillDetail.previousDue).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-between text-gray-600">
+                <span>पिछला बकाया (Previous Due carried forward)</span>
+                <span className="font-semibold text-gray-700">
+                  + ₹{paiseToRupees(
+                    selectedBillDetail.previousDue !== undefined
+                      ? selectedBillDetail.previousDue
+                      : Math.max(0, (selectedBillDetail.runningBalance !== undefined ? selectedBillDetail.runningBalance : selectedBillDetail.balance) - selectedBillDetail.debit + (selectedBillDetail.receivedNow || 0))
+                  ).toLocaleString('en-IN')}
+                </span>
+              </div>
 
-              {selectedBillDetail.grandTotal !== undefined && (
-                <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-200 pt-1">
-                  <span>कुल योग (Grand Total)</span>
-                  <span>₹{paiseToRupees(selectedBillDetail.grandTotal).toLocaleString('en-IN')}</span>
-                </div>
-              )}
+              <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-200 pt-1">
+                <span>कुल योग (Grand Total)</span>
+                <span>
+                  ₹{paiseToRupees(
+                    selectedBillDetail.grandTotal !== undefined
+                      ? selectedBillDetail.grandTotal
+                      : (selectedBillDetail.runningBalance !== undefined ? selectedBillDetail.runningBalance : selectedBillDetail.balance) + (selectedBillDetail.receivedNow || 0)
+                  ).toLocaleString('en-IN')}
+                </span>
+              </div>
 
               {selectedBillDetail.receivedNow > 0 && (
                 <div className="flex justify-between text-emerald-700 font-semibold">

@@ -182,7 +182,7 @@ router.get('/:id/ledger', authenticate, async (req: Request, res: Response) => {
     const [sales, payments] = await Promise.all([
       prisma.sale.findMany({
         where: salesWhere,
-        include: { items: true },
+        include: { items: { include: { vegetable: true } } },
         orderBy: { date: 'asc' },
       }),
       prisma.payment.findMany({
@@ -225,11 +225,21 @@ router.get('/:id/ledger', authenticate, async (req: Request, res: Response) => {
         runningBalance += netSale;
         entries.push({
           date: s.date,
-          description: `Sale #${s.id}`,
+          description: s.billNo ? `Bill ${s.billNo}` : `Sale #${s.id}`,
+          referenceId: s.billNo ? `Bill ${s.billNo}` : `Bill #${s.id}`,
+          saleId: s.id,
+          id: s.id,
+          billNo: s.billNo || s.id,
           debit: netSale,
           credit: 0,
           balance: runningBalance,
+          runningBalance: runningBalance,
           type: 'SALE',
+          items: s.items || [],
+          previousDue: runningBalance - netSale,
+          grandTotal: runningBalance,
+          receivedNow: s.paidAmount || 0,
+          notes: (s.items || []).map((it: any) => `${it.quantity} ${it.unit || 'kg'}`).join(', '),
         });
       } else {
         const p = item as any;
@@ -248,6 +258,9 @@ router.get('/:id/ledger', authenticate, async (req: Request, res: Response) => {
     res.json({
       buyer,
       openingBalance: buyer.openingBalance,
+      currentBalance: runningBalance,
+      entries: entries.reverse(),
+    });
       currentBalance: runningBalance,
       entries,
     });
