@@ -14,7 +14,8 @@ import {
   Edit2,
   Plus,
   Receipt,
-  CreditCard
+  CreditCard,
+  Printer
 } from 'lucide-react';
 
 export const BuyerDetail: React.FC = () => {
@@ -25,6 +26,7 @@ export const BuyerDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [ledgerView, setLedgerView] = useState<'cards' | 'table'>('cards');
 
   const buyerId = parseInt(id || '0');
 
@@ -107,13 +109,23 @@ Hussain Foods की तरफ से आपके खाते का पिछ
               {buyer.phone || 'No phone'}
             </p>
           </div>
-          <button
-            onClick={() => setEditModalOpen(true)}
-            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs flex items-center gap-1"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => window.print()}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs flex items-center gap-1 transition-colors"
+              title="खाता पर्ची प्रिंट करें"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>प्रिंट</span>
+            </button>
+            <button
+              onClick={() => setEditModalOpen(true)}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs flex items-center gap-1 transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Action Buttons inside Header */}
@@ -163,10 +175,32 @@ Hussain Foods की तरफ से आपके खाते का पिछ
         </div>
       </div>
 
-      {/* Section Title */}
+      {/* Section Title & View Switcher */}
       <div className="flex justify-between items-center px-4 pt-4 pb-2">
-        <span className="font-bold text-base text-[#1B2A1F]">खाता इतिहास / History</span>
-        <span className="text-xs text-[#5B6558]">Recent Ledger</span>
+        <div>
+          <span className="font-bold text-base text-[#1B2A1F]">खाता लेजर / Ledger</span>
+          <span className="text-[11px] text-[#5B6558] block">पूरा हिसाब व बकाया इतिहास</span>
+        </div>
+        <div className="bg-white border border-gray-300 p-0.5 rounded-lg flex items-center gap-1 text-[11px] font-bold shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setLedgerView('cards')}
+            className={`px-2 py-1 rounded-md transition-all ${
+              ledgerView === 'cards' ? 'bg-[#1F6B3A] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            कार्ड्स
+          </button>
+          <button
+            type="button"
+            onClick={() => setLedgerView('table')}
+            className={`px-2 py-1 rounded-md transition-all ${
+              ledgerView === 'table' ? 'bg-[#1F6B3A] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            लेजर टेबल (PRD)
+          </button>
+        </div>
       </div>
 
       {/* Ledger Entries List */}
@@ -175,7 +209,65 @@ Hussain Foods की तरफ से आपके खाते का पिछ
           <div className="bg-white border border-[#E3DFD0] rounded-xl p-6 text-center text-sm text-gray-500">
             कोई पुराना लेनदेन नहीं (No ledger history)
           </div>
+        ) : ledgerView === 'table' ? (
+          /* PRD 4.4 EXACT TABLE FORMAT */
+          <div className="bg-white border border-[#E3DFD0] rounded-xl overflow-hidden shadow-2xs">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#E4EFE6] text-[#1F6B3A] font-extrabold uppercase text-[10px]">
+                <tr>
+                  <th className="px-3 py-2.5">तारीख</th>
+                  <th className="px-3 py-2.5">प्रविष्टि (Entry)</th>
+                  <th className="px-3 py-2.5 text-right">रकम (Amount)</th>
+                  <th className="px-3 py-2.5 text-right">बकाया (Balance)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E3DFD0]">
+                {ledger?.entries?.map((entry: any, idx: number) => {
+                  const isSale = entry.type === 'SALE';
+                  const isOpening = entry.type === 'OPENING';
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="px-3 py-2.5 font-bold text-gray-700 whitespace-nowrap">
+                        {formatDate(entry.date, 'd MMM')}
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-gray-900">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={
+                              isSale
+                                ? 'text-blue-700 font-extrabold'
+                                : isOpening
+                                ? 'text-amber-700 font-extrabold'
+                                : 'text-emerald-700 font-extrabold'
+                            }
+                          >
+                            {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
+                          </span>
+                        </div>
+                        {entry.notes && (
+                          <span className="text-[10px] text-gray-500 block truncate max-w-[130px]">
+                            {entry.notes}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
+                        {entry.debit > 0 ? (
+                          <span className="text-gray-900">₹{paiseToRupees(entry.debit).toLocaleString('en-IN')}</span>
+                        ) : (
+                          <span className="text-emerald-700">₹{paiseToRupees(entry.credit).toLocaleString('en-IN')}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-black text-rose-700 whitespace-nowrap">
+                        ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
+          /* Cards View */
           ledger?.entries?.map((entry: any, idx: number) => {
             const isSale = entry.type === 'SALE';
             return (
