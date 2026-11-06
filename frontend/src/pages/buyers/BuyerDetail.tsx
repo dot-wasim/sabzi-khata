@@ -214,7 +214,7 @@ Hussain Foods की तरफ से आपके खाते का पिछ
                   <div>
                     <span className="text-gray-400 block text-[10px]">बाकी / Balance</span>
                     <span className="font-bold text-[#B3261E]">
-                      ₹{paiseToRupees(entry.runningBalance).toLocaleString('en-IN')}
+                      ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>

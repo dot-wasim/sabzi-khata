@@ -176,7 +176,7 @@ export const offlineDb = {
           .reduce((sum, p) => sum + (p.amount || 0), 0);
 
       const computedDue = (b.openingBalance || 0) + totalSold - totalReceived;
-      const due = b.currentDue !== undefined ? b.currentDue : computedDue;
+      const due = computedDue;
 
       return {
         ...b,
@@ -210,7 +210,7 @@ export const offlineDb = {
       payments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
     const computedDue = (buyer?.openingBalance || 0) + totalSold - totalReceived;
-    const balanceReceivable = buyer?.currentDue !== undefined ? buyer.currentDue : computedDue;
+    const balanceReceivable = computedDue;
 
     return {
       buyer: buyer ? { ...buyer, currentBalance: balanceReceivable, currentDue: balanceReceivable } : null,
@@ -362,7 +362,7 @@ export const offlineDb = {
           .reduce((sum, p) => sum + (p.amount || 0), 0);
 
       const computedDue = (s.openingBalance || 0) + totalPurchased - totalPaid;
-      const due = s.currentDue !== undefined ? s.currentDue : computedDue;
+      const due = computedDue;
 
       return {
         ...s,
@@ -396,7 +396,7 @@ export const offlineDb = {
       payments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
     const computedDue = (seller?.openingBalance || 0) + totalPurchased - totalPaid;
-    const currentBalance = seller?.currentDue !== undefined ? seller.currentDue : computedDue;
+    const currentBalance = computedDue;
 
     return {
       seller: seller ? { ...seller, currentBalance, currentDue: currentBalance } : null,

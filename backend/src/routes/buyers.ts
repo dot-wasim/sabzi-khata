@@ -63,6 +63,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
         createdAt: b.createdAt,
         updatedAt: b.updatedAt,
         currentBalance,
+        currentDue: currentBalance,
         totalSold,
         totalReceived,
       };
@@ -132,10 +133,16 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
     const lastSale = buyer.sales[0];
 
     res.json({
-      buyer,
+      buyer: {
+        ...buyer,
+        currentBalance: balanceReceivable,
+        currentDue: balanceReceivable,
+      },
       totalSold,
       totalReceived,
       balanceReceivable,
+      currentBalance: balanceReceivable,
+      currentDue: balanceReceivable,
       lastSaleDate: lastSale ? lastSale.date : null,
     });
   } catch (err) {
