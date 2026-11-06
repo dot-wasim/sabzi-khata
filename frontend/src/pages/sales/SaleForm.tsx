@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getBuyers } from '../../api/buyers';
+import { getBuyers, createBuyer } from '../../api/buyers';
 import { getVegetables } from '../../api/vegetables';
 import { getAccounts } from '../../api/accounts';
 import { createSale, getSale, updateSale, getSales } from '../../api/sales';
@@ -276,7 +276,16 @@ export const SaleForm: React.FC = () => {
       {/* Customer Header Card */}
       <div className="c">
         <div className="r">
-          <span className="m">Customer</span>
+          <div className="flex items-center gap-2">
+            <span className="m font-bold">Customer</span>
+            <button
+              type="button"
+              onClick={() => setBuyerModalOpen(true)}
+              className="text-xs font-bold text-[#1F6B45] hover:underline cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+            >
+              + Add Customer
+            </button>
+          </div>
           <span className="m">
             Bill no. {isEdit ? id : nextBillNo} · {formatDate(date, 'd MMM')}
           </span>
@@ -285,10 +294,17 @@ export const SaleForm: React.FC = () => {
           <div className="flex-1">
             <select
               value={buyerId}
-              onChange={(e) => setBuyerId(Number(e.target.value))}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  setBuyerModalOpen(true);
+                } else {
+                  setBuyerId(Number(e.target.value));
+                }
+              }}
               className="w-full font-bold text-base bg-transparent border-0 focus:outline-hidden cursor-pointer"
             >
               <option value="">-- ग्राहक चुनें / Select Customer --</option>
+              <option value="__new__">✨ + नया ग्राहक जोड़ें (+ Add Customer)</option>
               {buyers.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name} {b.shopName ? `(${b.shopName})` : ''}
@@ -505,9 +521,13 @@ export const SaleForm: React.FC = () => {
         <BuyerModal
           isOpen={buyerModalOpen}
           onClose={() => setBuyerModalOpen(false)}
-          onSave={async () => {
+          onSave={async (formData) => {
+            const newBuyer = await createBuyer(formData);
             const data = await getBuyers();
             setBuyers(data);
+            if (newBuyer?.id) {
+              setBuyerId(newBuyer.id);
+            }
             setBuyerModalOpen(false);
           }}
         />

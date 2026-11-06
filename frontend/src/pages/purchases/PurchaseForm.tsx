@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getSellers } from '../../api/sellers';
+import { getSellers, createSeller } from '../../api/sellers';
 import { getVegetables } from '../../api/vegetables';
 import { getAccounts } from '../../api/accounts';
 import { createPurchase, getPurchase, updatePurchase, getPurchases } from '../../api/purchases';
@@ -231,17 +231,33 @@ export const PurchaseForm: React.FC = () => {
       {/* Supplier Card */}
       <div className="c">
         <div className="r">
-          <span className="m">Supplier</span>
+          <div className="flex items-center gap-2">
+            <span className="m font-bold">Supplier</span>
+            <button
+              type="button"
+              onClick={() => setSellerModalOpen(true)}
+              className="text-xs font-bold text-[#1F6B45] hover:underline cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+            >
+              + Add Supplier
+            </button>
+          </div>
           <span className="m">{formatDate(date, 'd MMM')}</span>
         </div>
         <div className="r">
           <div className="flex-1">
             <select
               value={sellerId}
-              onChange={(e) => setSellerId(Number(e.target.value))}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  setSellerModalOpen(true);
+                } else {
+                  setSellerId(Number(e.target.value));
+                }
+              }}
               className="w-full font-bold text-base bg-transparent border-0 focus:outline-hidden cursor-pointer"
             >
               <option value="">-- सप्लायर चुनें / Select Supplier --</option>
+              <option value="__new__">✨ + नया सप्लायर जोड़ें (+ Add Supplier)</option>
               {sellers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} {s.village ? `(${s.village})` : ''}
@@ -515,9 +531,14 @@ export const PurchaseForm: React.FC = () => {
         <SellerModal
           isOpen={sellerModalOpen}
           onClose={() => setSellerModalOpen(false)}
-          onSave={async () => {
+          onSave={async (formData) => {
+            const newSeller = await createSeller(formData);
             const data = await getSellers();
-            setSellers((data as any).sellers || data);
+            const sList = (data as any).sellers || data || [];
+            setSellers(sList);
+            if (newSeller?.id) {
+              setSellerId(newSeller.id);
+            }
             setSellerModalOpen(false);
           }}
         />
