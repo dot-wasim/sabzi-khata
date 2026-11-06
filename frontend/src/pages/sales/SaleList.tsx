@@ -34,6 +34,9 @@ export const SaleList: React.FC = () => {
   // Active view tab: 'sales' | 'buyers' | 'payments'
   const [activeTab, setActiveTab] = useState<'sales' | 'buyers' | 'payments'>('sales');
 
+  // Time Period Filter: 'today' | 'week' | 'month' | 'year' | 'all'
+  const [periodFilter, setPeriodFilter] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('all');
+
   const [sales, setSales] = useState<Sale[]>([]);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -42,8 +45,6 @@ export const SaleList: React.FC = () => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyWithDues, setOnlyWithDues] = useState(false);
-  const [selectedBuyerFilter, setSelectedBuyerFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
 
   // Modals
   const [buyerModalOpen, setBuyerModalOpen] = useState(false);
@@ -73,18 +74,42 @@ export const SaleList: React.FC = () => {
     fetchData();
   }, []);
 
-  // Compute Daily & Khata Metrics
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaySales = sales.filter((s) => s.date?.startsWith(todayStr));
-  const todaySalesTotal = todaySales.reduce((sum, s) => {
+  // Time Period Matching Helper
+  const isDateInPeriod = (dateStr?: string) => {
+    if (!dateStr) return false;
+    if (periodFilter === 'all') return true;
+
+    const txDate = new Date(dateStr);
+    const now = new Date();
+
+    if (periodFilter === 'today') {
+      return dateStr.startsWith(now.toISOString().split('T')[0]);
+    }
+    if (periodFilter === 'week') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      return txDate >= oneWeekAgo && txDate <= now;
+    }
+    if (periodFilter === 'month') {
+      return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+    }
+    if (periodFilter === 'year') {
+      return txDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  // Compute Metrics across selected Period (Days, Months, Years)
+  const periodSales = sales.filter((s) => isDateInPeriod(s.date));
+  const periodSalesTotal = periodSales.reduce((sum, s) => {
     const itemsSum = s.items?.reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0) || 0;
     return sum + Math.max(0, itemsSum - (s.deductionAmount || 0));
   }, 0);
 
-  const todayCashReceived = todaySales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
-    payments
-      .filter((p) => p.date?.startsWith(todayStr))
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const periodPayments = payments.filter((p) => isDateInPeriod(p.date));
+  const periodCashReceived =
+    periodSales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
+    periodPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
   const totalMarketDues = buyers.reduce(
     (sum, b) => sum + ((b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0),
@@ -160,13 +185,17 @@ export const SaleList: React.FC = () => {
 
   // Filtered Sales
   const filteredSales = sales.filter((s) => {
-    if (dateFilter === 'today' && !s.date?.startsWith(todayStr)) return false;
-    if (selectedBuyerFilter && String(s.buyerId) !== selectedBuyerFilter) return false;
+    if (!isDateInPeriod(s.date)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchBuyer = s.buyer?.name?.toLowerCase().includes(q);
       const matchId = String(s.id).includes(q);
-      if (!matchBuyer && !matchId) return false;
+      const matchVeg = (s.items || []).some(
+        (it: any) =>
+          it.vegetable?.nameHi?.toLowerCase().includes(q) ||
+          it.vegetable?.nameEn?.toLowerCase().includes(q)
+      );
+      if (!matchBuyer && !matchId && !matchVeg) return false;
     }
     return true;
   });
@@ -187,7 +216,7 @@ export const SaleList: React.FC = () => {
 
   // Filtered Payments
   const filteredPayments = payments.filter((p) => {
-    if (dateFilter === 'today' && !p.date?.startsWith(todayStr)) return false;
+    if (!isDateInPeriod(p.date)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchBuyer = p.buyer?.name?.toLowerCase().includes(q);
@@ -197,20 +226,20 @@ export const SaleList: React.FC = () => {
   });
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto">
-      {/* Top Banner / Identity Header */}
+    <div className="space-y-5 max-w-5xl mx-auto font-sans">
+      {/* Top Banner / Financial Overview across Days, Months, Years */}
       <div className="bg-linear-to-r from-blue-900 via-indigo-900 to-blue-950 rounded-3xl p-5 sm:p-6 text-white shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-200 text-xs font-semibold mb-2 backdrop-blur-xs">
               <TrendingUp className="w-3.5 h-3.5 text-blue-300" />
-              <span>बिक्री व ग्राहक डेस्क · Counter Hub</span>
+              <span>System 1 · खरीदार व बिक्री खाता (Buyer UI)</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              ग्राहक व बिक्री खाता <span className="text-base font-normal text-blue-200">/ Sell Desk</span>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              खरीदार व बिक्री लेजर <span className="text-base font-normal text-blue-200">/ Sell Desk</span>
             </h1>
             <p className="text-xs sm:text-sm text-blue-100/80 mt-1">
-              दुकानदार बिलिंग, बाज़ार बाकी, और ग्राहक लेन-देन की पूरी गतिविधियां
+              सब्जी बिक्री, ग्राहक बकाया, लेजर और पेमेंट वसूली का पूरा हिसाब
             </p>
           </div>
 
@@ -229,7 +258,7 @@ export const SaleList: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/15 transition-all"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>+ नया ग्राहक</span>
+              <span>+ नया खरीदार</span>
             </button>
 
             <button
@@ -245,26 +274,52 @@ export const SaleList: React.FC = () => {
           </div>
         </div>
 
-        {/* 3 Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-white/15">
+        {/* Period Selector Chips (Days, Months, Years) */}
+        <div className="flex flex-wrap gap-1.5 mt-5 pt-4 border-t border-white/15">
+          <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider self-center mr-2">
+            समय सीमा (Period):
+          </span>
+          {[
+            { id: 'today', label: 'आज (Today)' },
+            { id: 'week', label: 'हफ्ता (This Week)' },
+            { id: 'month', label: 'महीना (This Month)' },
+            { id: 'year', label: 'साल (This Year)' },
+            { id: 'all', label: 'पूरा हिसाब (All Time)' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setPeriodFilter(tab.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                periodFilter === tab.id
+                  ? 'bg-white text-blue-900 shadow-xs scale-102'
+                  : 'bg-white/10 text-blue-200 hover:bg-white/20'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 3 Metrics Cards (Computed dynamically for selected period) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
             <span className="text-[11px] font-semibold text-blue-200 uppercase tracking-wider block">
-              आज की कुल बिक्री (Today Sales)
+              कुल बिक्री (Total Sold)
             </span>
-            <div className="text-2xl font-extrabold text-white mt-1">
-              <CurrencyDisplay amount={todaySalesTotal} />
+            <div className="text-2xl font-black text-white mt-1">
+              <CurrencyDisplay amount={periodSalesTotal} />
             </div>
             <span className="text-[11px] text-blue-200/80 mt-0.5 block">
-              {todaySales.length} बिल आज बने
+              {periodSales.length} बिल दर्ज हैं
             </span>
           </div>
 
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
             <span className="text-[11px] font-semibold text-emerald-200 uppercase tracking-wider block">
-              आज नकद वसूली (Collected Today)
+              कुल वसूली (Payments Received)
             </span>
-            <div className="text-2xl font-extrabold text-emerald-300 mt-1">
-              <CurrencyDisplay amount={todayCashReceived} />
+            <div className="text-2xl font-black text-emerald-300 mt-1">
+              <CurrencyDisplay amount={periodCashReceived} />
             </div>
             <span className="text-[11px] text-emerald-200/80 mt-0.5 block">
               बिल व जमा पर्ची से वसूली
@@ -275,11 +330,11 @@ export const SaleList: React.FC = () => {
             <span className="text-[11px] font-semibold text-rose-200 uppercase tracking-wider block">
               ग्राहकों पर कुल बाकी (Market Dues)
             </span>
-            <div className="text-2xl font-extrabold text-rose-300 mt-1">
+            <div className="text-2xl font-black text-rose-300 mt-1">
               <CurrencyDisplay amount={totalMarketDues} />
             </div>
             <span className="text-[11px] text-rose-200/80 mt-0.5 block">
-              {buyers.filter((b) => ((b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0) > 0).length} ग्राहकों पर बाकी
+              {buyers.filter((b) => ((b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0) > 0).length} खरीदारों पर बकाया
             </span>
           </div>
         </div>
@@ -289,38 +344,38 @@ export const SaleList: React.FC = () => {
       <div className="bg-white p-1.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab('sales')}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
             activeTab === 'sales'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-gray-600 hover:bg-gray-50'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
-          <span>बिक्री बिल ({sales.length})</span>
+          <span>बिक्री बिल ({filteredSales.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('buyers')}
-          className={`flex-1 min-w-[140px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 min-w-[150px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
             activeTab === 'buyers'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>ग्राहक खाता व बाकी ({buyers.length})</span>
+          <span>खरीदार लेजर व खाता ({buyers.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('payments')}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
             activeTab === 'payments'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-gray-600 hover:bg-gray-50'
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          <span>जमा रसीदें ({payments.length})</span>
+          <span>जमा रसीदें ({filteredPayments.length})</span>
         </button>
       </div>
 
@@ -334,60 +389,39 @@ export const SaleList: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               activeTab === 'sales'
-                ? 'बिल नंबर या ग्राहक का नाम खोजें...'
+                ? 'बिल नंबर, खरीदार या सब्ज़ी खोजें (जैसे आलू, टमाटर)...'
                 : activeTab === 'buyers'
-                ? 'ग्राहक का नाम या मोबाइल नंबर खोजें...'
+                ? 'खरीदार का नाम, दुकान या मोबाइल खोजें...'
                 : 'जमा रसीद खोजें...'
             }
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-hidden focus:border-blue-500"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-hidden focus:border-blue-500 font-medium"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          {activeTab === 'buyers' ? (
-            <button
-              onClick={() => setOnlyWithDues(!onlyWithDues)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${
-                onlyWithDues
-                  ? 'bg-rose-50 border-rose-300 text-rose-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-600'
-              }`}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              <span>सिर्फ बाकी वाले (Due only)</span>
-            </button>
-          ) : (
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
-              <button
-                onClick={() => setDateFilter('all')}
-                className={`flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold ${
-                  dateFilter === 'all' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'
-                }`}
-              >
-                सभी
-              </button>
-              <button
-                onClick={() => setDateFilter('today')}
-                className={`flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold ${
-                  dateFilter === 'today' ? 'bg-white text-blue-700 shadow-2xs' : 'text-gray-500'
-                }`}
-              >
-                आज के
-              </button>
-            </div>
-          )}
-        </div>
+        {activeTab === 'buyers' && (
+          <button
+            onClick={() => setOnlyWithDues(!onlyWithDues)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 w-full sm:w-auto justify-center ${
+              onlyWithDues
+                ? 'bg-rose-50 border-rose-300 text-rose-700'
+                : 'bg-gray-50 border-gray-200 text-gray-600'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>सिर्फ बाकी वाले (Due only)</span>
+          </button>
+        )}
       </div>
 
       {/* Content Rendering based on Tab */}
       {loading ? (
         <LoadingSpinner />
       ) : activeTab === 'sales' ? (
-        /* TAB 1: SALES INVOICES */
+        /* TAB 1: ALL INVOICES (WHAT WAS BOUGHT/SOLD AND AT WHAT RATE ACROSS DAYS/MONTHS/YEARS) */
         filteredSales.length === 0 ? (
           <EmptyState
             title="कोई बिक्री बिल नहीं मिला"
-            description="सब्जी बिक्री दर्ज करने के लिए नया बिल बनाएं।"
+            description="इस समय सीमा में कोई बिक्री बिल दर्ज नहीं है।"
             action={
               <button
                 onClick={() => navigate('/sales/new')}
@@ -418,7 +452,7 @@ export const SaleList: React.FC = () => {
                         <span>{formatDate(s.date)}</span>
                       </span>
                       <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800">
-                        {s.buyer?.name || 'ग्राहक'}
+                        {s.buyer?.name || 'खरीदार'}
                       </span>
                       {s.paymentMode && (
                         <span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
@@ -427,14 +461,14 @@ export const SaleList: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Vegetables line items */}
-                    <div className="text-xs text-gray-600 mt-2 flex flex-wrap gap-1.5">
+                    {/* Exact vegetables bought/sold and at what rate */}
+                    <div className="text-xs text-gray-700 mt-2 flex flex-wrap gap-1.5">
                       {s.items?.map((it: any, idx: number) => (
                         <span
                           key={idx}
-                          className="bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md font-medium text-gray-800"
+                          className="bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg font-bold text-gray-800"
                         >
-                          {it.vegetable?.nameHi || it.vegetable?.nameEn || 'सब्ज़ी'} {it.quantity} {it.unit} @ ₹{it.rate / 100}
+                          {it.vegetable?.nameHi || it.vegetable?.nameEn || 'सब्ज़ी'}: {it.quantity} {it.unit} @ ₹{it.rate / 100}/{it.unit}
                         </span>
                       ))}
                     </div>
@@ -447,19 +481,19 @@ export const SaleList: React.FC = () => {
                         <CurrencyDisplay amount={netTotal} />
                       </div>
                       {balance > 0 ? (
-                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-sm">
+                        <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md">
                           बाकी: <CurrencyDisplay amount={balance} />
                         </span>
                       ) : (
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-sm">
-                          पूरा नकद जमा
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                          पूरा चुकता (Paid)
                         </span>
                       )}
                     </div>
 
                     <button
                       onClick={(e) => shareBillWhatsApp(e, s)}
-                      title="WhatsApp पर बिल भेजें"
+                      title="WhatsApp पर बिल रसीद भेजें"
                       className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl border border-emerald-200 transition-colors flex items-center gap-1.5 text-xs font-bold"
                     >
                       <MessageCircle className="w-4 h-4 fill-emerald-600 text-transparent" />
@@ -472,17 +506,17 @@ export const SaleList: React.FC = () => {
           </div>
         )
       ) : activeTab === 'buyers' ? (
-        /* TAB 2: BUYERS / CUSTOMER KHATA */
+        /* TAB 2: BUYER KHATAS & LEDGERS */
         filteredBuyers.length === 0 ? (
           <EmptyState
-            title="कोई ग्राहक नहीं मिला"
-            description="नया ग्राहक जोड़ने के लिए नीचे क्लिक करें।"
+            title="कोई खरीदार नहीं मिला"
+            description="नया खरीदार जोड़ने के लिए नीचे क्लिक करें।"
             action={
               <button
                 onClick={() => setBuyerModalOpen(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold"
               >
-                + नया ग्राहक जोड़ें
+                + नया खरीदार जोड़ें
               </button>
             }
           />
@@ -504,7 +538,7 @@ export const SaleList: React.FC = () => {
                         <h4 className="font-extrabold text-gray-900 text-base leading-tight">
                           {b.name}
                         </h4>
-                        <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-2">
+                        <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-2">
                           {b.contactPerson && <span>व्यक्ति: {b.contactPerson}</span>}
                           {b.phone && <span>फोन: {b.phone}</span>}
                         </div>
@@ -515,7 +549,7 @@ export const SaleList: React.FC = () => {
                           बाकी खाता (Due)
                         </span>
                         <div
-                          className={`text-lg font-extrabold ${
+                          className={`text-lg font-black ${
                             hasDue ? 'text-rose-600' : 'text-emerald-600'
                           }`}
                         >
@@ -553,7 +587,7 @@ export const SaleList: React.FC = () => {
                       onClick={() => navigate(`/buyers/${b.id}`)}
                       className="py-1.5 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-0.5"
                     >
-                      <span>खाता</span>
+                      <span>खाता लेजर</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -567,7 +601,7 @@ export const SaleList: React.FC = () => {
         filteredPayments.length === 0 ? (
           <EmptyState
             title="कोई जमा रसीद नहीं मिली"
-            description="ग्राहकों से मिलने वाली बकाया वसूली यहां दिखेगी।"
+            description="खरीदारों से मिलने वाली बकाया वसूली यहां दिखेंगी।"
             action={
               <button
                 onClick={() => {
@@ -576,7 +610,7 @@ export const SaleList: React.FC = () => {
                 }}
                 className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold"
               >
-                + रुपया जमा करें
+                + रुपया जमा दर्ज करें
               </button>
             }
           />
@@ -593,7 +627,7 @@ export const SaleList: React.FC = () => {
                   </div>
                   <div>
                     <h5 className="font-bold text-gray-900 text-sm">
-                      {p.buyer?.name || 'ग्राहक'} से जमा
+                      {p.buyer?.name || 'खरीदार'} से जमा
                     </h5>
                     <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                       <span>{formatDate(p.date)}</span>
@@ -601,16 +635,14 @@ export const SaleList: React.FC = () => {
                       <span className="font-medium text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded-sm">
                         {p.paymentMode || 'नकद'}
                       </span>
-                      {p.account?.name && (
-                        <span>({p.account.name})</span>
-                      )}
+                      {p.account?.name && <span>({p.account.name})</span>}
                     </div>
                     {p.notes && <p className="text-xs text-gray-400 mt-0.5 italic">{p.notes}</p>}
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-base font-extrabold text-emerald-700">
+                  <span className="text-base font-black text-emerald-700">
                     + <CurrencyDisplay amount={p.amount} />
                   </span>
                   <span className="text-[10px] text-gray-400 block">जमा रसीद</span>

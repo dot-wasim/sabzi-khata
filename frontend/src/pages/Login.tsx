@@ -2,95 +2,171 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { login as apiLogin } from '../api/auth';
-import { Carrot, Lock, User as UserIcon } from 'lucide-react';
+import { Lock, User as UserIcon, TrendingUp, ShoppingCart, BarChart3, AlertCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('buyer');
+  const [password, setPassword] = useState('buyer123');
   const [error, setError] = useState('');
+  const [pausedNotice, setPausedNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (u: string, p: string) => {
     setError('');
+    setPausedNotice(null);
     setLoading(true);
 
     try {
-      const data = await apiLogin(username.trim(), password);
+      const data = await apiLogin(u.trim(), p);
       login(data.token, data.user);
-      // Navigate directly to Sell Desk (Buyer activities)
       navigate('/sales');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid username or password');
+      setError(err.response?.data?.error || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
   };
 
-  const performDirectLogin = async (u: string, p: string) => {
-    setError('');
-    setLoading(true);
-    try {
-      const data = await apiLogin(u, p);
-      login(data.token, data.user);
-      navigate('/sales');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleLogin(username, password);
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-emerald-50 via-white to-emerald-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 max-w-md w-full p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-md mb-3 text-white">
+    <div className="min-h-screen bg-linear-to-b from-blue-50 via-slate-50 to-blue-50 flex items-center justify-center p-4 font-sans">
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-200 max-w-md w-full p-6 sm:p-8 space-y-6">
+        {/* Brand Header */}
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-md mb-3 text-white">
             🥬
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Sabzi Khata</h1>
-          <p className="text-sm font-medium text-emerald-700 mt-1">Hussain Foods • सब्जी खाता</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Sabzi Khata</h1>
+          <p className="text-xs font-bold text-blue-700 mt-1 uppercase tracking-wider">Hussain Foods • सब्जी खाता</p>
         </div>
 
+        {/* 3 UIs System Selector */}
+        <div className="space-y-2.5">
+          <label className="block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider text-center">
+            लॉगिन UI चुनें (Select Login UI):
+          </label>
+
+          {/* 1. Buyer UI (ACTIVE) */}
+          <button
+            type="button"
+            onClick={() => handleLogin('buyer', 'buyer123')}
+            disabled={loading}
+            className="w-full p-3.5 rounded-2xl bg-linear-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-left flex items-center justify-between shadow-md hover:from-blue-700 hover:to-indigo-700 active:scale-98 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-sm font-extrabold block">1. Buyer UI (खरीदार व बिक्री)</span>
+                <span className="text-[11px] text-blue-100 font-medium block">
+                  सभी बिक्री बिल, खरीदार लेजर, बकाया व वसूली
+                </span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-400 text-emerald-950">
+              चालू / Active
+            </span>
+          </button>
+
+          {/* 2. Seller UI (PAUSED) */}
+          <button
+            type="button"
+            onClick={() => {
+              setPausedNotice('सिस्टम 2 (Seller UI · मंडी खरीद) अभी रोका गया है। पहले सिस्टम 1 (Buyer UI) पर काम जारी है।');
+            }}
+            className="w-full p-3 rounded-2xl bg-gray-50 text-gray-400 font-bold text-left flex items-center justify-between border border-dashed border-gray-300 hover:bg-gray-100 transition-all opacity-70"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gray-200 flex items-center justify-center text-gray-500">
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block text-gray-600">2. Seller UI (मंडी खरीद)</span>
+                <span className="text-[10px] text-gray-400 block">किसान व मंडी आवक लेजर</span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+              रोका गया / Paused
+            </span>
+          </button>
+
+          {/* 3. Boss UI (PAUSED) */}
+          <button
+            type="button"
+            onClick={() => {
+              setPausedNotice('सिस्टम 3 (Boss UI · मूल्यांकन व लाभ) अभी रोका गया है। पहले सिस्टम 1 (Buyer UI) पर काम जारी है।');
+            }}
+            className="w-full p-3 rounded-2xl bg-gray-50 text-gray-400 font-bold text-left flex items-center justify-between border border-dashed border-gray-300 hover:bg-gray-100 transition-all opacity-70"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gray-200 flex items-center justify-center text-gray-500">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block text-gray-600">3. Boss UI (मालिक डेस्क)</span>
+                <span className="text-[10px] text-gray-400 block">कुल लाभ, बैंक गल्ला व स्टॉक</span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+              रोका गया / Paused
+            </span>
+          </button>
+        </div>
+
+        {/* Paused Notice Alert */}
+        {pausedNotice && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>{pausedNotice}</span>
+          </div>
+        )}
+
+        {/* Error Alert */}
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Manual Credentials Option */}
+        <form onSubmit={handleFormSubmit} className="space-y-3 pt-2 border-t border-gray-100">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Username
+            <label className="block text-[11px] font-semibold text-gray-600 uppercase mb-1">
+              यूजरनेम (Username)
             </label>
             <div className="relative">
-              <UserIcon className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
+              <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. owner or market"
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                placeholder="buyer, owner, father..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Password
+            <label className="block text-[11px] font-semibold text-gray-600 uppercase mb-1">
+              पासवर्ड (Password)
             </label>
             <div className="relative">
-              <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold"
               />
             </div>
           </div>
@@ -98,43 +174,11 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl text-sm shadow-md transition-all disabled:opacity-50 mt-2"
+            className="w-full py-2.5 px-4 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign In (लॉग इन करें)'}
+            {loading ? 'लॉगिन हो रहा है...' : 'लॉगिन करें (Sign In)'}
           </button>
         </form>
-
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">
-            1-क्लिक सीधा लॉगिन (Quick Login):
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => performDirectLogin('father', 'father123')}
-              className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-extrabold text-xs border border-blue-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
-            >
-              <span>👨‍🦳 पिता जी (Father Login)</span>
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => performDirectLogin('owner', 'owner123')}
-              className="py-2.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 font-extrabold text-xs border border-purple-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
-            >
-              <span>👑 मालिक (Owner / Boss)</span>
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => performDirectLogin('market', 'market123')}
-              className="py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-extrabold text-xs border border-emerald-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95"
-            >
-              <span>🛒 मंडी ऑपरेटर (Operator)</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

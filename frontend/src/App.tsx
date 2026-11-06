@@ -40,7 +40,10 @@ export const App: React.FC = () => {
             {/* Authenticated Routes wrapped in Layout */}
             <Route element={<PrivateRoute />}>
               <Route element={<Layout />}>
-                {/* System 1: Sell Desk & Counter Operations (Accessible to Father & Brother) */}
+                {/* Default to System 1 (Buyer UI) */}
+                <Route path="/" element={<Navigate to="/sales" replace />} />
+
+                {/* System 1: Buyer UI & Counter Sales (Active & Focused) */}
                 <Route path="/sales" element={<SaleList />} />
                 <Route path="/sales/new" element={<SaleForm />} />
                 <Route path="/sales/:id" element={<SaleDetail />} />
@@ -61,7 +64,6 @@ export const App: React.FC = () => {
 
                 {/* System 3: Boss Desk & Financial Evaluations (Protected by PIN via BossRoute) */}
                 <Route element={<BossRoute />}>
-                  <Route path="/" element={<Dashboard />} />
                   <Route path="/boss" element={<Dashboard />} />
                   <Route path="/accounts" element={<AccountList />} />
                   <Route path="/stock" element={<StockView />} />
