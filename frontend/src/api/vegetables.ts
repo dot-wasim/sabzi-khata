@@ -2,13 +2,13 @@ import apiClient from './client';
 import { Vegetable } from '../utils/types';
 import { offlineDb } from '../storage/offlineDb';
 
-export async function getVegetables(search?: string): Promise<Vegetable[]> {
+export async function getVegetables(search?: string, showInactive?: boolean): Promise<Vegetable[]> {
   try {
-    const res = await apiClient.get('/vegetables', { params: { search } });
+    const res = await apiClient.get('/vegetables', { params: { search, showInactive } });
     return Array.isArray(res.data) ? res.data : res.data?.vegetables || [];
   } catch (err) {
     console.warn('Network API failed, using offline phone storage for vegetables:', err);
-    return offlineDb.getVegetables();
+    return offlineDb.getVegetables(showInactive);
   }
 }
 

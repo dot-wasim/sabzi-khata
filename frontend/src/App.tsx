@@ -59,6 +59,9 @@ export const App: React.FC = () => {
                 <Route path="/sellers" element={<SellerList />} />
                 <Route path="/sellers/:id" element={<SellerDetail />} />
 
+                {/* Shared Vegetable Management (Accessible by Sell, Buy & Boss Systems) */}
+                <Route path="/vegetables" element={<VegetableList />} />
+
                 {/* General Settings */}
                 <Route path="/settings/password" element={<ChangePassword />} />
 
@@ -68,7 +71,6 @@ export const App: React.FC = () => {
                   <Route path="/accounts" element={<AccountList />} />
                   <Route path="/stock" element={<StockView />} />
                   <Route path="/payments" element={<PaymentList />} />
-                  <Route path="/vegetables" element={<VegetableList />} />
                   <Route path="/wastage" element={<WastageList />} />
                   <Route path="/expenses" element={<ExpenseList />} />
                   <Route path="/reports" element={<ProfitReport />} />

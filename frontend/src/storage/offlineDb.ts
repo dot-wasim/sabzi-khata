@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   PURCHASES: 'sk_offline_purchases',
   ACCOUNTS: 'sk_offline_accounts',
   PAYMENTS: 'sk_offline_payments',
+  EXPENSES: 'sk_offline_expenses',
+  WASTAGES: 'sk_offline_wastages',
   SETTINGS: 'sk_offline_settings',
   USER: 'sk_offline_user',
   TOKEN: 'token',
@@ -833,6 +835,53 @@ export const offlineDb = {
     }
 
     return newPurchase;
+  },
+
+  // Expenses & Transportation
+  getExpenses: async (params?: any) => {
+    let all = getCollection<any>(STORAGE_KEYS.EXPENSES);
+    if (params?.category) {
+      all = all.filter((e) => e.category === params.category);
+    }
+    return { expenses: all, pagination: { total: all.length, page: 1, limit: 100, totalPages: 1 } };
+  },
+
+  createExpense: async (data: any) => {
+    const expenses = getCollection<any>(STORAGE_KEYS.EXPENSES);
+    const newExp = {
+      id: Date.now(),
+      amount: data.amount,
+      category: data.category || 'Transport',
+      date: data.date || new Date().toISOString(),
+      notes: data.notes,
+      accountId: data.accountId,
+      createdAt: new Date().toISOString(),
+    };
+    expenses.unshift(newExp);
+    saveCollection(STORAGE_KEYS.EXPENSES, expenses);
+    return newExp;
+  },
+
+  // Wastage / Spoilage
+  getWastages: async () => {
+    const all = getCollection<any>(STORAGE_KEYS.WASTAGES);
+    return { wastages: all, pagination: { total: all.length, page: 1, limit: 100, totalPages: 1 } };
+  },
+
+  createWastage: async (data: any) => {
+    const wastages = getCollection<any>(STORAGE_KEYS.WASTAGES);
+    const newWaste = {
+      id: Date.now(),
+      vegetableId: data.vegetableId,
+      quantity: data.quantity,
+      unit: data.unit || 'kg',
+      date: data.date || new Date().toISOString(),
+      reason: data.reason || 'Rotten / Spoilage',
+      createdAt: new Date().toISOString(),
+    };
+    wastages.unshift(newWaste);
+    saveCollection(STORAGE_KEYS.WASTAGES, wastages);
+    return newWaste;
   },
 
   // Reports / Dashboard

@@ -30,11 +30,8 @@ export const VegetableList: React.FC = () => {
     try {
       // Fetch both active-only and all vegetables
       const [activeData, allData] = await Promise.all([
-        getVegetables(),
-        // Custom query to see all deactivated seasonal vegetables
-        fetch('http://' + (window.location.hostname || 'localhost') + ':3001/api/vegetables?showInactive=true', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        }).then(r => r.json()).then(d => d.vegetables || d || []).catch(() => [])
+        getVegetables(undefined, false),
+        getVegetables(undefined, true),
       ]);
       setVegetables(activeData);
       setAllVegetables(allData.length > 0 ? allData : activeData);
@@ -122,16 +119,25 @@ export const VegetableList: React.FC = () => {
     );
   });
 
+  const activeSystem = localStorage.getItem('sk_active_system') || 'sell';
+  const fallbackPath = activeSystem === 'buy' ? '/purchases' : activeSystem === 'boss' ? '/boss' : '/sales';
+
   return (
     <div className="max-w-md mx-auto bg-[#F6F4EC] min-h-screen text-[#1B2A1F] pb-24 shadow-lg rounded-2xl overflow-hidden font-sans">
       {/* Header */}
       <div className="bg-[#1F6B3A] text-white p-5 pb-6">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate(fallbackPath);
+            }
+          }}
           className="flex items-center gap-2 text-sm text-white/90 hover:text-white mb-2"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span>वापस / Back</span>
+          <span>← वापस ({activeSystem === 'buy' ? 'खरीद मंडी' : activeSystem === 'boss' ? 'मालिक डेस्क' : 'बिक्री काउंटर'})</span>
         </button>
         <div className="flex items-baseline justify-between">
           <div>

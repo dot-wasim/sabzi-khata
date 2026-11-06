@@ -39,10 +39,10 @@ export const PurchaseList: React.FC = () => {
   const [payouts, setPayouts] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Search & Filter
+  // Search & Period Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyWithDues, setOnlyWithDues] = useState(false);
-  const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
+  const [periodFilter, setPeriodFilter] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
 
   // Modals
   const [sellerModalOpen, setSellerModalOpen] = useState(false);
@@ -72,17 +72,40 @@ export const PurchaseList: React.FC = () => {
     fetchData();
   }, []);
 
-  // Compute Daily & Mandi Metrics
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayPurchases = purchases.filter((p) => p.date?.startsWith(todayStr));
-  const todayPurchasesTotal = todayPurchases.reduce((sum, p) => {
+  // Filter by Period Logic (Day, Week, Month, Year, All Time)
+  const filterByPeriod = (itemDateStr: string | undefined) => {
+    if (!itemDateStr || periodFilter === 'all') return true;
+    const itemDate = new Date(itemDateStr);
+    const now = new Date();
+
+    if (periodFilter === 'today') {
+      return itemDate.toDateString() === now.toDateString();
+    } else if (periodFilter === 'week') {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      return itemDate >= oneWeekAgo && itemDate <= now;
+    } else if (periodFilter === 'month') {
+      return (
+        itemDate.getMonth() === now.getMonth() &&
+        itemDate.getFullYear() === now.getFullYear()
+      );
+    } else if (periodFilter === 'year') {
+      return itemDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  // Compute Period Metrics
+  const periodPurchases = purchases.filter((p) => filterByPeriod(p.date));
+  const periodPurchasesTotal = periodPurchases.reduce((sum, p) => {
     const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
     return sum + goods + (p.transport || 0) + (p.labour || 0);
   }, 0);
 
-  const todayCashPaid = todayPurchases.reduce((sum, p) => sum + (p.paidNow || 0), 0) +
+  const periodCashPaid =
+    periodPurchases.reduce((sum, p) => sum + (p.paidNow || 0), 0) +
     payouts
-      .filter((pay) => pay.date?.startsWith(todayStr))
+      .filter((pay) => filterByPeriod(pay.date))
       .reduce((sum, pay) => sum + (pay.amount || 0), 0);
 
   const totalFarmerPayables = sellers.reduce(
@@ -157,7 +180,7 @@ export const PurchaseList: React.FC = () => {
 
   // Filtered Purchases
   const filteredPurchases = purchases.filter((p) => {
-    if (dateFilter === 'today' && !p.date?.startsWith(todayStr)) return false;
+    if (!filterByPeriod(p.date)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchSeller = p.seller?.name?.toLowerCase().includes(q) || p.seller?.village?.toLowerCase().includes(q);
@@ -183,7 +206,7 @@ export const PurchaseList: React.FC = () => {
 
   // Filtered Payouts
   const filteredPayouts = payouts.filter((pay) => {
-    if (dateFilter === 'today' && !pay.date?.startsWith(todayStr)) return false;
+    if (!filterByPeriod(pay.date)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchSeller = pay.seller?.name?.toLowerCase().includes(q);
@@ -200,13 +223,13 @@ export const PurchaseList: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-xs font-semibold mb-2 backdrop-blur-xs">
               <ShoppingCart className="w-3.5 h-3.5 text-emerald-300" />
-              <span>खरीद व किसान डेस्क · Mandi Hub</span>
+              <span>System 2 · Buy Desk (मंडी खरीद व किसान खाता)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              किसान व खरीद खाता <span className="text-base font-normal text-emerald-200">/ Buy Desk</span>
+              खरीद व किसान खाता <span className="text-base font-normal text-emerald-200">/ Buy Desk</span>
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100/80 mt-1">
-              मंडी आवक, किसान लेजर, बकाया देनदारी और नकद भुगतान की पूरी गतिविधियां
+              मंडी आवक गाड़ियां, किसान लेजर, बकाया देनदारी और गाड़ी भाड़ा खर्च का पूरा हिसाब
             </p>
           </div>
 
@@ -218,6 +241,13 @@ export const PurchaseList: React.FC = () => {
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>+ नया खरीद बिल (+ New Buy)</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/vegetables')}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-800/80 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold border border-emerald-400/30 transition-all shadow-xs"
+            >
+              <span>🥦 सब्जियां (+/-)</span>
             </button>
 
             <button
@@ -241,29 +271,55 @@ export const PurchaseList: React.FC = () => {
           </div>
         </div>
 
+        {/* Multi-Period Filter Bar */}
+        <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-emerald-200 mr-1">हिसाब अवधि:</span>
+          {(
+            [
+              { id: 'today', label: 'आज (Today)' },
+              { id: 'week', label: 'हफ्ता (This Week)' },
+              { id: 'month', label: 'महीना (This Month)' },
+              { id: 'year', label: 'साल (This Year)' },
+              { id: 'all', label: 'पूरा हिसाब (All Time)' },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setPeriodFilter(item.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                periodFilter === item.id
+                  ? 'bg-white text-emerald-950 shadow-sm'
+                  : 'bg-white/10 hover:bg-white/20 text-emerald-100'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {/* 3 Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-white/15">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
             <span className="text-[11px] font-semibold text-emerald-200 uppercase tracking-wider block">
-              आज की कुल खरीद (Today Purchases)
+              कुल खरीद ({periodFilter === 'today' ? 'आज' : periodFilter === 'week' ? 'इस हफ्ते' : periodFilter === 'month' ? 'इस महीने' : periodFilter === 'year' ? 'इस साल' : 'कुल'})
             </span>
             <div className="text-2xl font-extrabold text-white mt-1">
-              <CurrencyDisplay amount={todayPurchasesTotal} />
+              <CurrencyDisplay amount={periodPurchasesTotal} />
             </div>
             <span className="text-[11px] text-emerald-200/80 mt-0.5 block">
-              {todayPurchases.length} मंडी आवक गाड़ियां / पर्चियां
+              {periodPurchases.length} खरीद बिल / गाड़ियां
             </span>
           </div>
 
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10">
             <span className="text-[11px] font-semibold text-rose-200 uppercase tracking-wider block">
-              आज का भुगतान (Paid Today)
+              कुल भुगतान (Paid to Sellers)
             </span>
             <div className="text-2xl font-extrabold text-rose-300 mt-1">
-              <CurrencyDisplay amount={todayCashPaid} />
+              <CurrencyDisplay amount={periodCashPaid} />
             </div>
             <span className="text-[11px] text-rose-200/80 mt-0.5 block">
-              खरीद व देनदारी भुगतान
+              खरीद बिल व बकाया भुगतान
             </span>
           </div>
 
@@ -352,26 +408,7 @@ export const PurchaseList: React.FC = () => {
               <Filter className="w-3.5 h-3.5" />
               <span>सिर्फ देनदारी वाले (Due only)</span>
             </button>
-          ) : (
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
-              <button
-                onClick={() => setDateFilter('all')}
-                className={`flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold ${
-                  dateFilter === 'all' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'
-                }`}
-              >
-                सभी
-              </button>
-              <button
-                onClick={() => setDateFilter('today')}
-                className={`flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold ${
-                  dateFilter === 'today' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-gray-500'
-                }`}
-              >
-                आज के
-              </button>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -426,7 +463,7 @@ export const PurchaseList: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Vegetables line items */}
+                    {/* Vegetables line items & Transport */}
                     <div className="text-xs text-gray-600 mt-2 flex flex-wrap gap-1.5">
                       {p.items?.map((it: any, idx: number) => (
                         <span
@@ -436,6 +473,16 @@ export const PurchaseList: React.FC = () => {
                           {it.vegetable?.nameHi || it.vegetable?.nameEn || 'सब्ज़ी'} {it.quantity} {it.unit} @ ₹{it.rate / 100}
                         </span>
                       ))}
+                      {p.transport > 0 && (
+                        <span className="bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">
+                          भाड़ा: ₹{Math.round(p.transport / 100)}
+                        </span>
+                      )}
+                      {p.labour > 0 && (
+                        <span className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded-md font-bold">
+                          मजदूरी: ₹{Math.round(p.labour / 100)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
