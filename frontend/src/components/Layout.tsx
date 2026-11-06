@@ -91,6 +91,12 @@ export const Layout: React.FC = () => {
       }`;
   };
 
+  const isFormPage =
+    location.pathname === '/sales/new' ||
+    (location.pathname.startsWith('/sales/') && location.pathname.endsWith('/edit')) ||
+    location.pathname === '/purchases/new' ||
+    (location.pathname.startsWith('/purchases/') && location.pathname.endsWith('/edit'));
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
       {/* ======================================================== */}
@@ -333,79 +339,81 @@ export const Layout: React.FC = () => {
       {/* ======================================================== */}
       {/* MOBILE BOTTOM NAVIGATION BAR — PURE AUTONOMOUS DESK TABS  */}
       {/* ======================================================== */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg">
-        {activeSystem === 'sell' && (
-          <>
-            <NavLink to="/sales" end className={getMobileBottomItemClass('blue')}>
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <span className="mt-0.5">बिक्री बिल</span>
-            </NavLink>
+      {!isFormPage && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg">
+          {activeSystem === 'sell' && (
+            <>
+              <NavLink to="/sales" end className={getMobileBottomItemClass('blue')}>
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+                <span className="mt-0.5">बिक्री बिल</span>
+              </NavLink>
 
-            <NavLink to="/sales/new" className={getMobileBottomItemClass('blue')}>
-              <PlusCircle className="w-5 h-5 text-blue-600" />
-              <span className="mt-0.5">+ नया बिल</span>
-            </NavLink>
+              <NavLink to="/sales/new" className={getMobileBottomItemClass('blue')}>
+                <PlusCircle className="w-5 h-5 text-blue-600" />
+                <span className="mt-0.5">+ नया बिल</span>
+              </NavLink>
 
-            <NavLink to="/buyers" className={getMobileBottomItemClass('blue')}>
-              <Users className="w-5 h-5 text-blue-600" />
-              <span className="mt-0.5">ग्राहक खाता</span>
-            </NavLink>
+              <NavLink to="/buyers" className={getMobileBottomItemClass('blue')}>
+                <Users className="w-5 h-5 text-blue-600" />
+                <span className="mt-0.5">ग्राहक खाता</span>
+              </NavLink>
 
-            <NavLink to="/vegetables" className={getMobileBottomItemClass('blue')}>
-              <Carrot className="w-5 h-5 text-blue-600" />
-              <span className="mt-0.5">सब्जियां</span>
-            </NavLink>
-          </>
-        )}
+              <NavLink to="/vegetables" className={getMobileBottomItemClass('blue')}>
+                <Carrot className="w-5 h-5 text-blue-600" />
+                <span className="mt-0.5">सब्जियां</span>
+              </NavLink>
+            </>
+          )}
 
-        {activeSystem === 'buy' && (
-          <>
-            <NavLink to="/purchases" end className={getMobileBottomItemClass('emerald')}>
-              <ShoppingCart className="w-5 h-5 text-emerald-600" />
-              <span className="mt-0.5">खरीद बिल</span>
-            </NavLink>
+          {activeSystem === 'buy' && (
+            <>
+              <NavLink to="/purchases" end className={getMobileBottomItemClass('emerald')}>
+                <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                <span className="mt-0.5">खरीद बिल</span>
+              </NavLink>
 
-            <NavLink to="/purchases/new" className={getMobileBottomItemClass('emerald')}>
-              <PlusCircle className="w-5 h-5 text-emerald-600" />
-              <span className="mt-0.5">+ नई खरीद</span>
-            </NavLink>
+              <NavLink to="/purchases/new" className={getMobileBottomItemClass('emerald')}>
+                <PlusCircle className="w-5 h-5 text-emerald-600" />
+                <span className="mt-0.5">+ नई खरीद</span>
+              </NavLink>
 
-            <NavLink to="/sellers" className={getMobileBottomItemClass('emerald')}>
-              <Users className="w-5 h-5 text-emerald-600" />
-              <span className="mt-0.5">किसान खाता</span>
-            </NavLink>
+              <NavLink to="/sellers" className={getMobileBottomItemClass('emerald')}>
+                <Users className="w-5 h-5 text-emerald-600" />
+                <span className="mt-0.5">किसान खाता</span>
+              </NavLink>
 
-            <NavLink to="/vegetables" className={getMobileBottomItemClass('emerald')}>
-              <Carrot className="w-5 h-5 text-emerald-600" />
-              <span className="mt-0.5">सब्जियां</span>
-            </NavLink>
-          </>
-        )}
+              <NavLink to="/vegetables" className={getMobileBottomItemClass('emerald')}>
+                <Carrot className="w-5 h-5 text-emerald-600" />
+                <span className="mt-0.5">सब्जियां</span>
+              </NavLink>
+            </>
+          )}
 
-        {activeSystem === 'boss' && (
-          <>
-            <NavLink to="/boss" end className={getMobileBottomItemClass('amber')}>
-              <BarChart3 className="w-5 h-5 text-[#22304A]" />
-              <span className="mt-0.5">मालिक P&L</span>
-            </NavLink>
+          {activeSystem === 'boss' && (
+            <>
+              <NavLink to="/boss" end className={getMobileBottomItemClass('amber')}>
+                <BarChart3 className="w-5 h-5 text-[#22304A]" />
+                <span className="mt-0.5">मालिक P&L</span>
+              </NavLink>
 
-            <NavLink to="/sales" className={getMobileBottomItemClass('amber')}>
-              <TrendingUp className="w-5 h-5 text-[#22304A]" />
-              <span className="mt-0.5">बिक्री ऑडिट</span>
-            </NavLink>
+              <NavLink to="/sales" className={getMobileBottomItemClass('amber')}>
+                <TrendingUp className="w-5 h-5 text-[#22304A]" />
+                <span className="mt-0.5">बिक्री ऑडिट</span>
+              </NavLink>
 
-            <NavLink to="/purchases" className={getMobileBottomItemClass('amber')}>
-              <ShoppingCart className="w-5 h-5 text-[#22304A]" />
-              <span className="mt-0.5">खरीद ऑडिट</span>
-            </NavLink>
+              <NavLink to="/purchases" className={getMobileBottomItemClass('amber')}>
+                <ShoppingCart className="w-5 h-5 text-[#22304A]" />
+                <span className="mt-0.5">खरीद ऑडिट</span>
+              </NavLink>
 
-            <NavLink to="/accounts" className={getMobileBottomItemClass('amber')}>
-              <Landmark className="w-5 h-5 text-[#22304A]" />
-              <span className="mt-0.5">गल्ला व बैंक</span>
-            </NavLink>
-          </>
-        )}
-      </nav>
+              <NavLink to="/accounts" className={getMobileBottomItemClass('amber')}>
+                <Landmark className="w-5 h-5 text-[#22304A]" />
+                <span className="mt-0.5">गल्ला व बैंक</span>
+              </NavLink>
+            </>
+          )}
+        </nav>
+      )}
     </div>
   );
 };

@@ -275,16 +275,29 @@ _Thank you for your business!_`;
   }
 
   return (
-    <div className="max-w-md mx-auto bg-[#F6F4EC] min-h-screen text-[#1B2A1F] pb-24 shadow-lg rounded-2xl overflow-hidden font-sans">
-      {/* Dark Green Mandi Header */}
+    <div className="max-w-md mx-auto bg-[#F6F4EC] min-h-screen text-[#1B2A1F] pb-36 shadow-lg rounded-2xl overflow-hidden font-sans">
+      {/* Dark Green Mandi Header with Top Save Button */}
       <div className="bg-[#1F6B3A] text-white p-5 pb-6">
-        <button
-          onClick={() => navigate('/sales')}
-          className="flex items-center gap-2 text-sm text-white/90 hover:text-white mb-2"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>वापस / Back</span>
-        </button>
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={() => navigate('/sales')}
+            className="flex items-center gap-2 text-sm text-white/90 hover:text-white"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>वापस / Back</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSubmit}
+            className="px-3.5 py-1.5 bg-white text-[#1F6B3A] font-black text-xs rounded-xl shadow-md hover:bg-emerald-50 active:scale-95 flex items-center gap-1.5 transition-all"
+          >
+            <Check className="w-4 h-4 stroke-[3]" />
+            <span>{saving ? 'सेव हो रहा...' : '💾 बिल सेव करें'}</span>
+          </button>
+        </div>
+
         <div className="flex items-baseline justify-between">
           <div>
             <h1 className="text-2xl font-bold">
@@ -694,14 +707,36 @@ _Thank you for your business!_`;
             </span>
           </div>
         </div>
+
+        {/* PROMINENT INLINE ACTION BUTTONS (ALWAYS VISIBLE DIRECTLY IN FORM) */}
+        <div className="pt-2 space-y-2.5">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSubmit}
+            className="w-full min-h-[52px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-lg transition-all disabled:opacity-50"
+          >
+            <Check className="w-6 h-6 stroke-[3]" />
+            <span>{saving ? 'बिल सेव हो रहा है...' : '💾 बिल सेव करें (Save Bill)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleShareWhatsApp}
+            className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-2xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-2xs"
+          >
+            <Share2 className="w-5 h-5 text-emerald-600" />
+            <span>📲 WhatsApp पर बिल शेयर करें (Share Bill)</span>
+          </button>
+        </div>
       </div>
 
-      {/* Floating Sticky Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-xs border-t border-[#E3DFD0] grid grid-cols-2 gap-2.5 max-w-md mx-auto z-40 shadow-lg">
+      {/* Floating Sticky Action Bar (Elevated Z-Index) */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 grid grid-cols-2 gap-3 max-w-md mx-auto z-50 shadow-2xl">
         <button
           type="button"
           onClick={handleShareWhatsApp}
-          className="w-full min-h-[48px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-bold text-sm rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-2xs"
+          className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-xs"
         >
           <Share2 className="w-4 h-4 text-emerald-600" />
           <span>WhatsApp</span>
@@ -711,10 +746,10 @@ _Thank you for your business!_`;
           type="button"
           disabled={saving}
           onClick={handleSubmit}
-          className="w-full min-h-[48px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
+          className="w-full min-h-[46px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
         >
-          <Check className="w-5 h-5" />
-          <span>{saving ? 'सेव हो रहा है...' : 'बिल सेव करें'}</span>
+          <Check className="w-5 h-5 stroke-[3]" />
+          <span>{saving ? 'सेव हो रहा...' : '💾 बिल सेव करें'}</span>
         </button>
       </div>
 
