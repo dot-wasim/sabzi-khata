@@ -10,6 +10,7 @@ import { BuyerModal } from '../buyers/BuyerModal';
 import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
+import { useSimulator } from '../../context/SimulatorContext';
 import {
   ArrowLeft,
   Plus,
@@ -35,6 +36,7 @@ export const SaleForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEdit = !!id;
+  const { openWhatsAppModal, isSimulator } = useSimulator();
 
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [vegetables, setVegetables] = useState<Vegetable[]>([]);
@@ -291,7 +293,12 @@ _धन्यवाद! Hussain Foods_`;
     const url = cleanPhone.length >= 10
       ? `https://wa.me/91${cleanPhone.slice(-10)}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+
+    if (isSimulator) {
+      openWhatsAppModal(msg, cleanPhone, buyerName);
+    } else {
+      window.open(url, '_blank');
+    }
   };
 
   const handlePrintPdf = () => {

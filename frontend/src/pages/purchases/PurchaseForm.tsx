@@ -9,6 +9,7 @@ import { SellerModal } from '../sellers/SellerModal';
 import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
+import { useSimulator } from '../../context/SimulatorContext';
 import {
   ArrowLeft,
   Plus,
@@ -47,6 +48,7 @@ export const PurchaseForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEdit = !!id;
+  const { openWhatsAppModal, isSimulator } = useSimulator();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [vegetables, setVegetables] = useState<Vegetable[]>([]);
@@ -410,7 +412,12 @@ _Hussain Foods - Sabzi Mandi_`;
     const url = cleanPhone.length >= 10
       ? `https://wa.me/91${cleanPhone.slice(-10)}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+
+    if (isSimulator) {
+      openWhatsAppModal(msg, cleanPhone, sellerName);
+    } else {
+      window.open(url, '_blank');
+    }
   };
 
   const handlePrintPdf = () => {

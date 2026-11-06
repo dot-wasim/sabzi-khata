@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useBossAuth } from '../context/BossAuthContext';
+import { useSimulator } from '../context/SimulatorContext';
 import { offlineDb } from '../storage/offlineDb';
 import {
   TrendingUp,
@@ -22,6 +23,7 @@ import {
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const { lockBoss } = useBossAuth();
+  const { isSimulator } = useSimulator();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -120,11 +122,11 @@ export const Layout: React.FC = () => {
     (location.pathname.startsWith('/purchases/') && location.pathname.endsWith('/edit'));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
+    <div className={isSimulator ? "min-h-full bg-gray-50 flex flex-col font-sans" : "min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans"}>
       {/* ======================================================== */}
       {/* DESKTOP SIDEBAR — ADAPTS TO ACTIVE AUTONOMOUS SYSTEM     */}
       {/* ======================================================== */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 shrink-0 h-screen sticky top-0 shadow-2xs">
+      <aside className={isSimulator ? "hidden" : "hidden md:flex flex-col w-64 bg-white border-r border-gray-200 shrink-0 h-screen sticky top-0 shadow-2xs"}>
         {/* Brand */}
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -303,7 +305,7 @@ export const Layout: React.FC = () => {
       {/* ======================================================== */}
       {/* MOBILE TOP HEADER — CLEAR IDENTITY & SYSTEM SWITCHER    */}
       {/* ======================================================== */}
-      <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs">
+      <header className={isSimulator ? "bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs" : "md:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs"}>
         <div className="flex items-center gap-2.5">
           <div
             className={`w-8 h-8 rounded-xl text-white flex items-center justify-center text-base shadow-xs ${
@@ -379,7 +381,7 @@ export const Layout: React.FC = () => {
       {/* ======================================================== */}
       {/* MAIN OUTLET CONTAINER                                    */}
       {/* ======================================================== */}
-      <main className="flex-1 pb-24 md:pb-8 p-4 md:p-8 max-w-6xl mx-auto w-full">
+      <main className={isSimulator ? "flex-1 pb-20 p-2 w-full" : "flex-1 pb-24 md:pb-8 p-4 md:p-8 max-w-6xl mx-auto w-full"}>
         <Outlet />
       </main>
 
@@ -387,7 +389,7 @@ export const Layout: React.FC = () => {
       {/* MOBILE BOTTOM NAVIGATION BAR — PURE AUTONOMOUS DESK TABS  */}
       {/* ======================================================== */}
       {!isFormPage && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg">
+        <nav className={isSimulator ? "fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg" : "md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 grid grid-cols-4 items-center pb-safe shadow-lg"}>
           {activeSystem === 'sell' && (
             <>
               <NavLink to="/sales" end className={getMobileBottomItemClass('blue')}>

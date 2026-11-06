@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { BossAuthProvider } from './context/BossAuthContext';
+import { SimulatorProvider } from './context/SimulatorContext';
+import { MacSimulator } from './components/MacSimulator';
 import { Layout } from './components/Layout';
 import { PrivateRoute, RoleRoute } from './components/PrivateRoute';
 import { BossRoute } from './components/BossRoute';
@@ -33,55 +35,59 @@ export const App: React.FC = () => {
   return (
     <AuthProvider>
       <BossAuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+        <SimulatorProvider>
+          <BrowserRouter>
+            <MacSimulator>
+              <Routes>
+                <Route path="/login" element={<Login />} />
 
-            {/* Authenticated Routes wrapped in Layout */}
-            <Route element={<PrivateRoute />}>
-              <Route element={<Layout />}>
-                {/* Default to System 1 (Buyer UI) */}
-                <Route path="/" element={<Navigate to="/sales" replace />} />
+                {/* Authenticated Routes wrapped in Layout */}
+                <Route element={<PrivateRoute />}>
+                  <Route element={<Layout />}>
+                    {/* Default to System 1 (Buyer UI) */}
+                    <Route path="/" element={<Navigate to="/sales" replace />} />
 
-                {/* System 1: Buyer UI & Counter Sales (Active & Focused) */}
-                <Route path="/sales" element={<SaleList />} />
-                <Route path="/sales/new" element={<SaleForm />} />
-                <Route path="/sales/:id" element={<SaleDetail />} />
-                <Route path="/sales/:id/edit" element={<SaleForm />} />
-                <Route path="/buyers" element={<BuyerList />} />
-                <Route path="/buyers/:id" element={<BuyerDetail />} />
+                    {/* System 1: Buyer UI & Counter Sales (Active & Focused) */}
+                    <Route path="/sales" element={<SaleList />} />
+                    <Route path="/sales/new" element={<SaleForm />} />
+                    <Route path="/sales/:id" element={<SaleDetail />} />
+                    <Route path="/sales/:id/edit" element={<SaleForm />} />
+                    <Route path="/buyers" element={<BuyerList />} />
+                    <Route path="/buyers/:id" element={<BuyerDetail />} />
 
-                {/* System 2: Buy Desk & Mandi Operations (Accessible to Father & Brother) */}
-                <Route path="/purchases" element={<PurchaseList />} />
-                <Route path="/purchases/new" element={<PurchaseForm />} />
-                <Route path="/purchases/:id" element={<PurchaseDetail />} />
-                <Route path="/purchases/:id/edit" element={<PurchaseForm />} />
-                <Route path="/sellers" element={<SellerList />} />
-                <Route path="/sellers/:id" element={<SellerDetail />} />
+                    {/* System 2: Buy Desk & Mandi Operations (Accessible to Father & Brother) */}
+                    <Route path="/purchases" element={<PurchaseList />} />
+                    <Route path="/purchases/new" element={<PurchaseForm />} />
+                    <Route path="/purchases/:id" element={<PurchaseDetail />} />
+                    <Route path="/purchases/:id/edit" element={<PurchaseForm />} />
+                    <Route path="/sellers" element={<SellerList />} />
+                    <Route path="/sellers/:id" element={<SellerDetail />} />
 
-                {/* Shared Vegetable Management (Accessible by Sell, Buy & Boss Systems) */}
-                <Route path="/vegetables" element={<VegetableList />} />
+                    {/* Shared Vegetable Management (Accessible by Sell, Buy & Boss Systems) */}
+                    <Route path="/vegetables" element={<VegetableList />} />
 
-                {/* General Settings */}
-                <Route path="/settings/password" element={<ChangePassword />} />
+                    {/* General Settings */}
+                    <Route path="/settings/password" element={<ChangePassword />} />
 
-                {/* System 3: Boss Desk & Financial Evaluations (Protected by PIN via BossRoute) */}
-                <Route element={<BossRoute />}>
-                  <Route path="/boss" element={<Dashboard />} />
-                  <Route path="/accounts" element={<AccountList />} />
-                  <Route path="/stock" element={<StockView />} />
-                  <Route path="/payments" element={<PaymentList />} />
-                  <Route path="/wastage" element={<WastageList />} />
-                  <Route path="/expenses" element={<ExpenseList />} />
-                  <Route path="/reports" element={<ProfitReport />} />
-                  <Route path="/audit-log" element={<AuditLogView />} />
+                    {/* System 3: Boss Desk & Financial Evaluations (Protected by PIN via BossRoute) */}
+                    <Route element={<BossRoute />}>
+                      <Route path="/boss" element={<Dashboard />} />
+                      <Route path="/accounts" element={<AccountList />} />
+                      <Route path="/stock" element={<StockView />} />
+                      <Route path="/payments" element={<PaymentList />} />
+                      <Route path="/wastage" element={<WastageList />} />
+                      <Route path="/expenses" element={<ExpenseList />} />
+                      <Route path="/reports" element={<ProfitReport />} />
+                      <Route path="/audit-log" element={<AuditLogView />} />
+                    </Route>
+                  </Route>
                 </Route>
-              </Route>
-            </Route>
 
-            <Route path="*" element={<Navigate to="/sales" replace />} />
-          </Routes>
-        </BrowserRouter>
+                <Route path="*" element={<Navigate to="/sales" replace />} />
+              </Routes>
+            </MacSimulator>
+          </BrowserRouter>
+        </SimulatorProvider>
       </BossAuthProvider>
     </AuthProvider>
   );
