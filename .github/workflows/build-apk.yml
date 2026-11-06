@@ -3,12 +3,16 @@ name: Build Android APK (Sabzi Khata)
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
   build-apk:
     name: Build Release & Debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -47,9 +51,33 @@ jobs:
         working-directory: frontend/android
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload Debug APK
+      - name: Copy & Rename APK
+        run: |
+          mkdir -p build-output
+          cp frontend/android/app/build/outputs/apk/debug/app-debug.apk build-output/Sabzi-Khata-v1.4.apk
+          cp frontend/android/app/build/outputs/apk/debug/app-debug.apk build-output/Sabzi-Khata-latest.apk
+
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sabzi-Khata-Debug-APK
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          name: Sabzi-Khata-v1.4-APK
+          path: build-output/Sabzi-Khata-v1.4.apk
           if-no-files-found: error
+
+      - name: Publish GitHub Release (if tag or dispatch)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build-output/Sabzi-Khata-v1.4.apk
+            build-output/Sabzi-Khata-latest.apk
+          name: Sabzi Khata Release ${{ github.ref_name }}
+          body: |
+            ## Sabzi Khata (Hussain Foods) — ${{ github.ref_name }}
+            - Fully upgraded with custom UI design system
+            - On-the-fly Add Customer and Add Supplier in bill & purchase desks
+            - Double-tap lock & bill saved success confirmation popup
+            - 1-tap customer ledger bill detail & previous due calculation breakdown
+            - Dedicated desk-based login (Sell, Buy, Boss)
+          draft: false
+          prerelease: false
