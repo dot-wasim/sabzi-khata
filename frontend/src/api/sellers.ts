@@ -25,7 +25,7 @@ export async function getSellerLedger(id: number, from?: string, to?: string): P
     const res = await apiClient.get(`/sellers/${id}/ledger`, { params: { from, to } });
     return res.data;
   } catch (err) {
-    return offlineDb.getSeller(id);
+    return offlineDb.getSellerLedger(id);
   }
 }
 

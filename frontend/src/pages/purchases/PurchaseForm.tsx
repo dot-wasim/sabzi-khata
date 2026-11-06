@@ -6,6 +6,7 @@ import { getAccounts } from '../../api/accounts';
 import { createPurchase, getPurchase, updatePurchase } from '../../api/purchases';
 import { Seller, Vegetable, Account } from '../../utils/types';
 import { SellerModal } from '../sellers/SellerModal';
+import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
 import {
@@ -39,6 +40,8 @@ export const PurchaseForm: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sellerModalOpen, setSellerModalOpen] = useState(false);
+  const [vegModalOpen, setVegModalOpen] = useState(false);
+  const [pendingVegItemIdx, setPendingVegItemIdx] = useState<number | null>(null);
 
   // Form fields
   const [date, setDate] = useState(toInputDate(new Date()));
@@ -392,9 +395,15 @@ _Hussain Foods - Sabzi Mandi_`;
                   <div className="flex items-center gap-2 max-w-[70%]">
                     <select
                       value={item.vegetableId}
-                      onChange={(e) =>
-                        handleItemChange(idx, 'vegetableId', Number(e.target.value))
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__new__') {
+                          setPendingVegItemIdx(idx);
+                          setVegModalOpen(true);
+                        } else {
+                          handleItemChange(idx, 'vegetableId', Number(val));
+                        }
+                      }}
                       className="font-bold text-base bg-transparent text-[#1B2A1F] focus:outline-hidden pr-2 cursor-pointer truncate"
                     >
                       <option value={0}>-- सब्ज़ी चुनें / Select --</option>
@@ -403,6 +412,7 @@ _Hussain Foods - Sabzi Mandi_`;
                           {v.nameHi} · {v.nameEn}
                         </option>
                       ))}
+                      <option value="__new__">+ नई सब्ज़ी जोड़ें...</option>
                     </select>
 
                     {isTomato && (
@@ -706,6 +716,19 @@ _Hussain Foods - Sabzi Mandi_`;
         isOpen={sellerModalOpen}
         onClose={() => setSellerModalOpen(false)}
         onSave={handleCreateSeller}
+      />
+
+      {/* On-the-Fly New Vegetable Modal */}
+      <VegetableModal
+        isOpen={vegModalOpen}
+        onClose={() => setVegModalOpen(false)}
+        onSuccess={(newVeg) => {
+          setVegetables((prev) => [...prev, newVeg]);
+          if (pendingVegItemIdx !== null) {
+            handleItemChange(pendingVegItemIdx, 'vegetableId', newVeg.id);
+            handleItemChange(pendingVegItemIdx, 'unit', newVeg.unit || 'kg');
+          }
+        }}
       />
     </div>
   );

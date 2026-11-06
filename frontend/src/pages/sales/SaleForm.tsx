@@ -7,6 +7,7 @@ import { createSale, getSale, updateSale } from '../../api/sales';
 import { Buyer, Vegetable, Account } from '../../utils/types';
 import { CurrencyDisplay } from '../../components/CurrencyDisplay';
 import { BuyerModal } from '../buyers/BuyerModal';
+import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
 import {
@@ -40,6 +41,8 @@ export const SaleForm: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [buyerModalOpen, setBuyerModalOpen] = useState(false);
+  const [vegModalOpen, setVegModalOpen] = useState(false);
+  const [pendingVegItemIdx, setPendingVegItemIdx] = useState<number | null>(null);
 
   // Form fields
   const [date, setDate] = useState(toInputDate(new Date()));
@@ -343,7 +346,19 @@ _Thank you for your business!_`;
         <div className="pt-1">
           <div className="flex justify-between items-center mb-2">
             <span className="font-bold text-base text-[#1B2A1F]">सामान / Items</span>
-            <span className="text-xs text-gray-500">{items.length} item(s)</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingVegItemIdx(null);
+                  setVegModalOpen(true);
+                }}
+                className="text-xs font-bold text-[#1F6B3A] bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors"
+              >
+                + नई सब्ज़ी (New Veg)
+              </button>
+              <span className="text-xs text-gray-500">{items.length} item(s)</span>
+            </div>
           </div>
 
           <div className="space-y-2.5">
@@ -365,9 +380,15 @@ _Thank you for your business!_`;
                     <div className="flex items-center gap-2 max-w-[70%]">
                       <select
                         value={item.vegetableId}
-                        onChange={(e) =>
-                          handleItemChange(idx, 'vegetableId', Number(e.target.value))
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__new__') {
+                            setPendingVegItemIdx(idx);
+                            setVegModalOpen(true);
+                          } else {
+                            handleItemChange(idx, 'vegetableId', Number(val));
+                          }
+                        }}
                         className="font-bold text-base bg-transparent text-[#1B2A1F] focus:outline-hidden pr-2 cursor-pointer truncate"
                       >
                         <option value={0}>-- सब्ज़ी चुनें / Select --</option>
@@ -376,6 +397,7 @@ _Thank you for your business!_`;
                             {v.nameEn} / {v.nameHi}
                           </option>
                         ))}
+                        <option value="__new__">+ नई सब्ज़ी जोड़ें...</option>
                       </select>
 
                       {isTomato && (
@@ -701,6 +723,19 @@ _Thank you for your business!_`;
         isOpen={buyerModalOpen}
         onClose={() => setBuyerModalOpen(false)}
         onSave={handleCreateBuyer}
+      />
+
+      {/* On-the-Fly New Vegetable Modal */}
+      <VegetableModal
+        isOpen={vegModalOpen}
+        onClose={() => setVegModalOpen(false)}
+        onSuccess={(newVeg) => {
+          setVegetables((prev) => [...prev, newVeg]);
+          if (pendingVegItemIdx !== null) {
+            handleItemChange(pendingVegItemIdx, 'vegetableId', newVeg.id);
+            handleItemChange(pendingVegItemIdx, 'unit', newVeg.unit || 'kg');
+          }
+        }}
       />
     </div>
   );

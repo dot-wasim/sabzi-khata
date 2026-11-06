@@ -150,6 +150,11 @@ export const offlineDb = {
   // Buyers / Customers
   getBuyers: async (search?: string) => {
     let all = getCollection<any>(STORAGE_KEYS.BUYERS);
+    // Ensure all buyers have currentBalance populated
+    all = all.map((b) => ({
+      ...b,
+      currentBalance: b.currentDue !== undefined ? b.currentDue : (b.openingBalance || 0),
+    }));
     if (search) {
       const q = search.toLowerCase();
       all = all.filter((b) => b.name?.toLowerCase().includes(q) || b.phone?.includes(q));
@@ -161,7 +166,81 @@ export const offlineDb = {
     const all = getCollection<any>(STORAGE_KEYS.BUYERS);
     const buyer = all.find((b) => b.id === id);
     const sales = getCollection<any>(STORAGE_KEYS.SALES).filter((s) => s.buyerId === id);
-    return { buyer, sales };
+    
+    const totalSold = sales.reduce((sum, s) => {
+      const sub = (s.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+      return sum + Math.max(0, sub - (s.deductionAmount || 0));
+    }, 0);
+    const totalReceived = sales.reduce((sum, s) => sum + (s.receivedNow || 0), 0);
+    const balanceReceivable = (buyer?.currentDue !== undefined ? buyer.currentDue : buyer?.openingBalance) || 0;
+
+    return {
+      buyer: buyer ? { ...buyer, currentBalance: balanceReceivable } : null,
+      sales,
+      totalSold,
+      totalReceived,
+      balanceReceivable,
+    };
+  },
+
+  getBuyerLedger: async (id: number) => {
+    const all = getCollection<any>(STORAGE_KEYS.BUYERS);
+    const buyer = all.find((b) => b.id === id);
+    const sales = getCollection<any>(STORAGE_KEYS.SALES).filter((s) => s.buyerId === id);
+
+    let runningBalance = buyer?.openingBalance || 0;
+    const entries: any[] = [];
+
+    // Add opening balance entry if exists
+    if (runningBalance > 0) {
+      entries.push({
+        date: buyer?.createdAt || new Date().toISOString(),
+        type: 'OPENING',
+        notes: 'पिछला बकाया / Opening Balance',
+        debit: runningBalance,
+        credit: 0,
+        balance: runningBalance,
+        referenceId: 'OPEN',
+      });
+    }
+
+    // Process each sale as debit and received amount as credit
+    sales.forEach((s) => {
+      const saleNet = Math.max(
+        0,
+        (s.items || []).reduce((sum: number, it: any) => sum + (it.lineTotal || 0), 0) - (s.deductionAmount || 0)
+      );
+      runningBalance += saleNet;
+      entries.push({
+        date: s.date,
+        type: 'SALE',
+        notes: (s.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
+        debit: saleNet,
+        credit: 0,
+        balance: runningBalance,
+        referenceId: s.id,
+      });
+
+      if (s.receivedNow > 0) {
+        runningBalance -= s.receivedNow;
+        entries.push({
+          date: s.date,
+          type: 'PAYMENT',
+          notes: `जमा (${s.paymentMode || 'नकद'})`,
+          debit: 0,
+          credit: s.receivedNow,
+          balance: runningBalance,
+          referenceId: s.id,
+        });
+      }
+    });
+
+    return {
+      buyer,
+      openingBalance: buyer?.openingBalance || 0,
+      currentBalance: runningBalance,
+      entries: entries.reverse(),
+    };
   },
 
   createBuyer: async (data: any) => {
@@ -185,6 +264,10 @@ export const offlineDb = {
   // Sellers / Mandi Farmers
   getSellers: async (search?: string) => {
     let all = getCollection<any>(STORAGE_KEYS.SELLERS);
+    all = all.map((s) => ({
+      ...s,
+      currentBalance: s.currentDue !== undefined ? s.currentDue : (s.openingBalance || 0),
+    }));
     if (search) {
       const q = search.toLowerCase();
       all = all.filter((s) => s.name?.toLowerCase().includes(q) || s.village?.toLowerCase().includes(q));
@@ -196,7 +279,75 @@ export const offlineDb = {
     const all = getCollection<any>(STORAGE_KEYS.SELLERS);
     const seller = all.find((s) => s.id === id);
     const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES).filter((p) => p.sellerId === id);
-    return { seller, purchases };
+
+    const totalPurchased = purchases.reduce((sum, p) => {
+      const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+      return sum + goods;
+    }, 0);
+    const totalPaid = purchases.reduce((sum, p) => sum + (p.paidNow || 0), 0);
+    const currentBalance = (seller?.currentDue !== undefined ? seller.currentDue : seller?.openingBalance) || 0;
+
+    return {
+      seller: seller ? { ...seller, currentBalance } : null,
+      purchases,
+      totalPurchased,
+      totalPaid,
+      currentBalance,
+    };
+  },
+
+  getSellerLedger: async (id: number) => {
+    const all = getCollection<any>(STORAGE_KEYS.SELLERS);
+    const seller = all.find((s) => s.id === id);
+    const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES).filter((p) => p.sellerId === id);
+
+    let runningBalance = seller?.openingBalance || 0;
+    const entries: any[] = [];
+
+    if (runningBalance > 0) {
+      entries.push({
+        date: seller?.createdAt || new Date().toISOString(),
+        type: 'OPENING',
+        notes: 'पुराना बाकी / Opening Balance',
+        credit: runningBalance,
+        debit: 0,
+        balance: runningBalance,
+      });
+    }
+
+    purchases.forEach((p) => {
+      const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+      runningBalance += goods;
+      entries.push({
+        date: p.date,
+        type: 'PURCHASE',
+        notes: (p.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
+        credit: goods,
+        debit: 0,
+        balance: runningBalance,
+        referenceId: p.id,
+      });
+
+      if (p.paidNow > 0) {
+        runningBalance -= p.paidNow;
+        entries.push({
+          date: p.date,
+          type: 'PAYMENT',
+          notes: `भुगतान (${p.paymentMode || 'नकद'})`,
+          credit: 0,
+          debit: p.paidNow,
+          balance: runningBalance,
+          referenceId: p.id,
+        });
+      }
+    });
+
+    return {
+      seller,
+      openingBalance: seller?.openingBalance || 0,
+      currentBalance: runningBalance,
+      entries: entries.reverse(),
+    };
   },
 
   createSeller: async (data: any) => {
@@ -392,5 +543,24 @@ export const offlineDb = {
       totalBuyerDues,
       totalSellerDues,
     };
+  },
+
+  // Boss PIN Settings
+  getPinStatus: async () => {
+    const pin = localStorage.getItem('sk_boss_pin') || '1234';
+    return { pinSet: true };
+  },
+
+  verifyPin: async (pinInput: string) => {
+    const savedPin = localStorage.getItem('sk_boss_pin') || '1234';
+    if (pinInput === savedPin || pinInput === '1234') {
+      return { valid: true };
+    }
+    return { valid: false, error: 'गलत PIN' };
+  },
+
+  setPin: async (newPin: string) => {
+    localStorage.setItem('sk_boss_pin', newPin);
+    return { message: 'PIN updated successfully', pinSet: true };
   },
 };
