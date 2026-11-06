@@ -125,9 +125,17 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
           {/* Desk Quick Switcher Tabs */}
           <div className="bg-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs font-bold border border-slate-700">
             <button
+              onClick={() => navigate('/')}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                location.pathname === '/' ? 'bg-[#1F6B45] text-white shadow-xs' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>🏠 Home</span>
+            </button>
+            <button
               onClick={() => navigate('/sales')}
               className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                isSell ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                isSell ? 'bg-[#1F6B45] text-white shadow-xs' : 'text-slate-300 hover:text-white'
               }`}
             >
               <span>🥬 Sell Desk</span>
@@ -135,7 +143,7 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
             <button
               onClick={() => navigate('/purchases')}
               className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                isBuy ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                isBuy ? 'bg-[#1F6B45] text-white shadow-xs' : 'text-slate-300 hover:text-white'
               }`}
             >
               <span>🚜 Buy Desk</span>
@@ -146,7 +154,7 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
                 navigate('/boss');
               }}
               className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                isBoss ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                isBoss ? 'bg-[#B4540A] text-white shadow-xs' : 'text-slate-300 hover:text-white'
               }`}
             >
               <span>👑 Boss Desk</span>
@@ -207,35 +215,62 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
 
             <div className="space-y-1.5 text-xs font-bold">
               <button
-                onClick={() => navigate('/sales/new')}
-                className="w-full text-left p-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 flex items-center justify-between transition-all"
+                onClick={() => navigate('/')}
+                className="w-full text-left p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
               >
-                <span>📝 + नया बिक्री बिल (Sell Bill)</span>
-                <span className="text-blue-400">→</span>
+                <span>🏠 मुख्य पृष्ठ (Home Overview)</span>
+                <span className="text-slate-400">→</span>
+              </button>
+
+              <button
+                onClick={() => navigate('/sales/new')}
+                className="w-full text-left p-2 rounded-xl bg-[#1F6B45]/20 hover:bg-[#1F6B45]/30 text-emerald-300 border border-[#1F6B45]/40 flex items-center justify-between transition-all"
+              >
+                <span>📝 + नया दैनिक बिल (Sell Bill)</span>
+                <span className="text-emerald-400">→</span>
+              </button>
+
+              <button
+                onClick={() => navigate('/buyers')}
+                className="w-full text-left p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
+              >
+                <span>👥 ग्राहक खाते व लेजर (Accounts)</span>
+                <span className="text-slate-400">→</span>
               </button>
 
               <button
                 onClick={() => navigate('/purchases/new')}
-                className="w-full text-left p-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 flex items-center justify-between transition-all"
+                className="w-full text-left p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 flex items-center justify-between transition-all"
               >
                 <span>🛒 + नई मंडी खरीद (Mandi Buy)</span>
                 <span className="text-emerald-400">→</span>
               </button>
 
               <button
-                onClick={() => navigate('/buyers')}
-                className="w-full text-left p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
+                onClick={() => navigate('/sellers')}
+                className="w-full text-left p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
               >
-                <span>👥 खरीदार खाते व लेजर (Accounts)</span>
+                <span>🚜 सप्लायर सूची व लेजर (Suppliers)</span>
                 <span className="text-slate-400">→</span>
               </button>
 
               <button
                 onClick={() => navigate('/vegetables')}
-                className="w-full text-left p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
+                className="w-full text-left p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-between transition-all"
               >
-                <span>🥬 सब्जियां सूची (Vegetable List)</span>
+                <span>🥬 सब्जियां व क्रेट वजन (Vegetables)</span>
                 <span className="text-slate-400">→</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  unlockBoss();
+                  navigate('/boss');
+                }}
+                className="w-full text-left p-2 rounded-xl bg-[#B4540A]/20 hover:bg-[#B4540A]/30 text-amber-300 border border-[#B4540A]/40 flex items-center justify-between transition-all"
+              >
+                <span>👑 बॉस डेस्क (Boss Desk Reports)</span>
+                <span className="text-amber-400">→</span>
               </button>
             </div>
           </div>
@@ -301,9 +336,9 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
             <div className="absolute -right-[14px] top-32 w-[4px] h-16 bg-slate-700 rounded-r-md" />
 
             {/* SCREEN VIEWPORT CONTAINER */}
-            <div className="relative w-full h-full bg-[#F6F4EC] rounded-[42px] overflow-hidden flex flex-col shadow-inner select-text">
+            <div className="relative w-full h-full bg-[#F6F7F2] rounded-[42px] overflow-hidden flex flex-col shadow-inner select-text">
               {/* TOP MOBILE STATUS BAR */}
-              <div className="h-9 bg-[#1F6B3A] text-white px-6 flex items-center justify-between text-[11px] font-bold z-40 shrink-0 select-none">
+              <div className="h-9 bg-[#1F6B45] text-white px-6 flex items-center justify-between text-[11px] font-bold z-40 shrink-0 select-none">
                 <span>{currentTime || '4:40 PM'}</span>
 
                 {/* Dynamic Island / Punch Hole */}

@@ -1,36 +1,172 @@
 @import "tailwindcss";
 
+/* ======================================================== */
+/* HUSSAIN FOODS — SABZI KHATA CORE DESIGN SYSTEM           */
+/* (Direct implementation of user's custom UI prototype)     */
+/* ======================================================== */
+
+:root {
+  --sk-bg: #F6F7F2;
+  --sk-text: #1B2A1F;
+  --sk-muted: #4D5C50;
+  --sk-border: #DDE3D6;
+  --sk-green: #1F6B45;
+  --sk-green-light: #E8EDE2;
+  --sk-amber: #B4540A;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #F6F7F2;
+  color: #1B2A1F;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* User Prototype Exact Classes */
+.s {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: #F6F7F2;
+  padding: 16px 16px 88px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.h {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: #1B2A1F;
+  line-height: 1.25;
+}
+
+.c {
+  background: #ffffff;
+  border: 1px solid #DDE3D6;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.r {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.m {
+  color: #4D5C50;
+  font-size: 12px;
+}
+
+.d {
+  color: #B4540A;
+  font-weight: 600;
+}
+
+.b {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #1F6B45;
+  font: 600 15px Inter, sans-serif;
+  background: #1F6B45;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0 16px;
+  text-decoration: none;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+
+.b:hover {
+  opacity: 0.94;
+}
+
+.b:active {
+  transform: scale(0.99);
+}
+
+.b2 {
+  background: #ffffff;
+  color: #1F6B45;
+  border: 1px solid #1F6B45;
+}
+
+.t {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.t button,
+.t a {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  font: 600 13px Inter, sans-serif;
+  background: #E8EDE2;
+  color: #1B2A1F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0 10px;
+  transition: all 0.15s ease;
+}
+
+.t .on {
+  background: #1F6B45;
+  color: #ffffff;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #1F6B45;
+  transition: width 0.3s ease;
+}
+
+.k {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #DDE3D6;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.k b {
+  font-size: 20px;
+  display: block;
+  color: #1B2A1F;
+  margin-top: 2px;
+}
+
 /* Indian currency styling */
 .currency {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
 /* Bottom nav safe area */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Smooth transitions */
-* {
-  -webkit-tap-highlight-color: transparent;
 }
 
 /* Mobile input zoom prevention */
@@ -45,33 +181,3 @@
   }
 }
 
-/* Toast animations */
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideOut {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
-.toast-enter {
-  animation: slideIn 0.3s ease-out;
-}
-
-.toast-exit {
-  animation: slideOut 0.3s ease-in;
-}

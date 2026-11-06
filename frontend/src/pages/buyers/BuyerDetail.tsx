@@ -3,32 +3,26 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getBuyer, getBuyerLedger, updateBuyer } from '../../api/buyers';
 import { createPayment } from '../../api/payments';
 import { BuyerModal } from './BuyerModal';
-import { PaymentModal } from '../payments/PaymentModal';
 import { formatDate } from '../../utils/date';
-import { paiseToRupees } from '../../utils/currency';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import {
-  ArrowLeft,
-  Phone,
-  MessageCircle,
-  Edit2,
-  Plus,
-  Receipt,
-  CreditCard,
-  Printer
-} from 'lucide-react';
+import { paiseToRupees, rupeesToPaise } from '../../utils/currency';
 
 export const BuyerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const buyerId = parseInt(id || '0');
+
   const [data, setData] = useState<any>(null);
   const [ledger, setLedger] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [ledgerView, setLedgerView] = useState<'cards' | 'table'>('cards');
+  const [showPaymentBox, setShowPaymentBox] = useState(false);
+  const [ledgerView, setLedgerView] = useState<'cards' | 'table'>('table');
 
-  const buyerId = parseInt(id || '0');
+  // Payment box inputs
+  const [paymentAmountRupees, setPaymentAmountRupees] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'CASH' | 'UPI' | 'BANK' | 'CHEQUE' | 'OTHER'>('UPI');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -50,38 +44,58 @@ export const BuyerDetail: React.FC = () => {
     if (buyerId) fetchData();
   }, [buyerId]);
 
-  const handleUpdate = async (formData: any) => {
-    await updateBuyer(buyerId, formData);
-    fetchData();
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <LoadingSpinner />
+      <div className="s flex items-center justify-center min-h-[60vh]">
+        <span className="m font-semibold">लोड हो रहा है...</span>
       </div>
     );
   }
 
-  if (!data) return <div className="p-8 text-center text-gray-500">Buyer not found</div>;
+  if (!data) {
+    return (
+      <div className="s text-center py-12">
+        <span className="m">Customer not found</span>
+        <button type="button" onClick={() => navigate('/buyers')} className="b mt-4">
+          Back to Accounts
+        </button>
+      </div>
+    );
+  }
 
-  const { buyer, totalSold, totalReceived, balanceReceivable } = data;
+  const { buyer, balanceReceivable } = data;
+  const currentDueRupees = paiseToRupees(balanceReceivable);
 
-  const handleCall = () => {
-    if (buyer.phone) {
-      window.open(`tel:${buyer.phone}`, '_self');
-    } else {
-      alert('Phone number not recorded');
+  const handleSavePayment = async () => {
+    const amt = parseFloat(paymentAmountRupees);
+    if (!amt || amt <= 0) {
+      alert('कृपया वैध रकम दर्ज करें (Enter valid amount)');
+      return;
+    }
+
+    setSavingPayment(true);
+    try {
+      await createPayment({
+        direction: 'RECEIVED_FROM_BUYER',
+        amount: rupeesToPaise(amt),
+        date: new Date().toISOString(),
+        paymentMethod: paymentMode,
+        buyerId: buyerId,
+        notes: paymentNote || undefined,
+      });
+      setPaymentAmountRupees('');
+      setPaymentNote('');
+      setShowPaymentBox(false);
+      await fetchData();
+    } catch (err: any) {
+      alert(`त्रुटि: ${err.message || 'पेमेंट दर्ज नहीं हो सकी'}`);
+    } finally {
+      setSavingPayment(false);
     }
   };
 
   const handleWhatsAppReminder = () => {
-    const dueAmount = paiseToRupees(balanceReceivable);
-    const msg = `नमस्ते ${buyer.name} जी,
-Hussain Foods की तरफ से आपके खाते का पिछला बकाया ₹${dueAmount.toLocaleString('en-IN')} है।
-कृपया समय पर भुगतान करने का कष्ट करें।
-धन्यवाद!`;
-
+    const msg = `नमस्ते ${buyer.name} जी,\nHussain Foods की तरफ से आपके खाते का पिछला बकाया ₹${currentDueRupees.toLocaleString('en-IN')} है।\nकृपया समय पर भुगतान करने का कष्ट करें।\nधन्यवाद!`;
     const cleanPhone = buyer.phone ? buyer.phone.replace(/[^0-9]/g, '') : '';
     const url = cleanPhone
       ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`
@@ -89,275 +103,261 @@ Hussain Foods की तरफ से आपके खाते का पिछ
     window.open(url, '_blank');
   };
 
+  const paymentAmtVal = parseFloat(paymentAmountRupees) || 0;
+  const dueAfterPayment = Math.max(0, currentDueRupees - paymentAmtVal);
+
   return (
-    <div className="max-w-md mx-auto bg-[#F6F4EC] min-h-screen text-[#1B2A1F] pb-24 shadow-lg rounded-2xl overflow-hidden font-sans">
-      {/* Top Header Card */}
-      <div className="bg-[#1F6B3A] text-white p-5 pb-16">
+    <div className="s">
+      {/* Top Header */}
+      <div className="r">
+        <h1 className="h">{buyer.name}</h1>
         <button
+          type="button"
           onClick={() => navigate('/buyers')}
-          className="flex items-center gap-2 text-sm text-white/90 hover:text-white mb-2.5"
+          className="text-xs font-semibold text-[#1F6B45]"
         >
-          <ArrowLeft className="w-5 h-5" />
-          <span>ग्राहक / Customers</span>
+          ← Back to Accounts
         </button>
+      </div>
 
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold">{buyer.name}</h1>
-            <p className="text-xs text-white/80 mt-0.5">
-              {buyer.shopName ? `${buyer.shopName} · ` : ''}
-              {buyer.phone || 'No phone'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => window.print()}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs flex items-center gap-1 transition-colors"
-              title="खाता पर्ची प्रिंट करें"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>प्रिंट</span>
-            </button>
-            <button
-              onClick={() => setEditModalOpen(true)}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs flex items-center gap-1 transition-colors"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-              <span>Edit</span>
-            </button>
-          </div>
+      {/* Customer Info Card */}
+      <div className="c">
+        <div className="r">
+          <span className="m">Customer account</span>
+          <span className="m">{buyer.phone || 'No phone'}</span>
         </div>
-
-        {/* Quick Action Buttons inside Header */}
-        <div className="grid grid-cols-2 gap-2.5 mt-4">
-          <button
-            onClick={handleCall}
-            className="min-h-[44px] rounded-xl bg-white/20 hover:bg-white/30 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <Phone className="w-4 h-4" />
-            <span>फोन करें / Call</span>
-          </button>
-          <button
-            onClick={handleWhatsAppReminder}
-            className="min-h-[44px] rounded-xl bg-white text-[#1F6B3A] font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-emerald-50 transition-colors"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>WhatsApp याद दिलाएं</span>
-          </button>
+        <div className="r">
+          <b>{buyer.shopName ? `${buyer.shopName}` : buyer.address || 'Hussain Foods'}</b>
+          <b className="d text-base">Due ₹{currentDueRupees.toLocaleString('en-IN')}</b>
         </div>
       </div>
 
-      {/* 4-Stat Overlapping Card */}
-      <div className="-mt-10 mx-4 bg-white border border-[#E3DFD0] rounded-xl p-4 grid grid-cols-2 gap-3 shadow-sm">
-        <div>
-          <div className="text-xs text-[#5B6558]">पुराना बाकी / Opening</div>
-          <div className="font-bold text-base mt-0.5">
-            ₹{paiseToRupees(buyer.openingBalance || 0).toLocaleString('en-IN')}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-[#5B6558]">कुल बिल / Total billed</div>
-          <div className="font-bold text-base mt-0.5">
-            ₹{paiseToRupees(totalSold).toLocaleString('en-IN')}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-[#5B6558]">कुल जमा / Total paid</div>
-          <div className="text-[#1F6B3A] font-bold text-base mt-0.5">
-            ₹{paiseToRupees(totalReceived).toLocaleString('en-IN')}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-[#5B6558]">अभी बाकी / Balance due</div>
-          <div className="text-[#B3261E] font-extrabold text-xl mt-0.5">
-            ₹{paiseToRupees(balanceReceivable).toLocaleString('en-IN')}
-          </div>
-        </div>
+      {/* Quick Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setShowPaymentBox(!showPaymentBox)}
+          className="b flex-1"
+        >
+          {showPaymentBox ? 'Close Payment' : '+ Receive payment'}
+        </button>
+        <button
+          type="button"
+          onClick={handleWhatsAppReminder}
+          className="b b2 flex-1"
+        >
+          WhatsApp reminder
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="b b2 px-3"
+          title="Print statement"
+        >
+          Print
+        </button>
       </div>
 
-      {/* Section Title & View Switcher */}
-      <div className="flex justify-between items-center px-4 pt-4 pb-2">
-        <div>
-          <span className="font-bold text-base text-[#1B2A1F]">खाता लेजर / Ledger</span>
-          <span className="text-[11px] text-[#5B6558] block">पूरा हिसाब व बकाया इतिहास</span>
-        </div>
-        <div className="bg-white border border-gray-300 p-0.5 rounded-lg flex items-center gap-1 text-[11px] font-bold shadow-2xs">
+      {/* Receive Payment In-place Box (matches Payment.txt exactly) */}
+      {showPaymentBox && (
+        <div className="c border-2 border-[#1F6B45]">
+          <b className="text-base">Receive payment</b>
+          <label className="m" htmlFor="a">Amount received</label>
+          <input
+            id="a"
+            type="number"
+            step="any"
+            placeholder="₹ Amount"
+            value={paymentAmountRupees}
+            onChange={(e) => setPaymentAmountRupees(e.target.value)}
+            className="min-h-[44px] border border-[#DDE3D6] rounded-[10px] px-3 font-semibold text-lg bg-white"
+          />
+
+          <span className="m">Payment mode</span>
+          <div className="t">
+            <button
+              type="button"
+              className={paymentMode === 'CASH' ? 'on' : ''}
+              onClick={() => setPaymentMode('CASH')}
+            >
+              Cash
+            </button>
+            <button
+              type="button"
+              className={paymentMode === 'UPI' ? 'on' : ''}
+              onClick={() => setPaymentMode('UPI')}
+            >
+              UPI
+            </button>
+            <button
+              type="button"
+              className={paymentMode === 'BANK' ? 'on' : ''}
+              onClick={() => setPaymentMode('BANK')}
+            >
+              Bank
+            </button>
+          </div>
+          <div className="t mt-1">
+            <button
+              type="button"
+              className={paymentMode === 'CHEQUE' ? 'on' : ''}
+              onClick={() => setPaymentMode('CHEQUE')}
+            >
+              Cheque
+            </button>
+            <button
+              type="button"
+              className={paymentMode === 'OTHER' ? 'on' : ''}
+              onClick={() => setPaymentMode('OTHER')}
+            >
+              Other
+            </button>
+          </div>
+
+          <label className="m mt-1" htmlFor="n">Note (optional)</label>
+          <input
+            id="n"
+            type="text"
+            placeholder="Example: paid by son"
+            value={paymentNote}
+            onChange={(e) => setPaymentNote(e.target.value)}
+            className="min-h-[44px] border border-[#DDE3D6] rounded-[10px] px-3 text-sm bg-white"
+          />
+
+          <div className="border-t border-[#DDE3D6] pt-2 mt-1">
+            <div className="r">
+              <span className="m">Due after this payment</span>
+              <b className="d">₹{dueAfterPayment.toLocaleString('en-IN')}</b>
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={() => setLedgerView('cards')}
-            className={`px-2 py-1 rounded-md transition-all ${
-              ledgerView === 'cards' ? 'bg-[#1F6B3A] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            disabled={savingPayment}
+            onClick={handleSavePayment}
+            className="b mt-1"
           >
-            कार्ड्स
+            {savingPayment ? 'Saving...' : 'Save payment'}
           </button>
+        </div>
+      )}
+
+      {/* Ledger Table Section */}
+      <div className="r mt-1">
+        <b>Account ledger</b>
+        <div className="t">
           <button
             type="button"
+            className={ledgerView === 'table' ? 'on' : ''}
             onClick={() => setLedgerView('table')}
-            className={`px-2 py-1 rounded-md transition-all ${
-              ledgerView === 'table' ? 'bg-[#1F6B3A] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            style={{ minHeight: '32px', padding: '0 8px', fontSize: '11px' }}
           >
-            लेजर टेबल (PRD)
+            Table (PRD)
+          </button>
+          <button
+            type="button"
+            className={ledgerView === 'cards' ? 'on' : ''}
+            onClick={() => setLedgerView('cards')}
+            style={{ minHeight: '32px', padding: '0 8px', fontSize: '11px' }}
+          >
+            Cards
           </button>
         </div>
       </div>
 
-      {/* Ledger Entries List */}
-      <div className="px-4 space-y-2.5">
-        {ledger?.entries?.length === 0 ? (
-          <div className="bg-white border border-[#E3DFD0] rounded-xl p-6 text-center text-sm text-gray-500">
-            कोई पुराना लेनदेन नहीं (No ledger history)
-          </div>
-        ) : ledgerView === 'table' ? (
-          /* PRD 4.4 EXACT TABLE FORMAT */
-          <div className="bg-white border border-[#E3DFD0] rounded-xl overflow-hidden shadow-2xs">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#E4EFE6] text-[#1F6B3A] font-extrabold uppercase text-[10px]">
-                <tr>
-                  <th className="px-3 py-2.5">तारीख</th>
-                  <th className="px-3 py-2.5">प्रविष्टि (Entry)</th>
-                  <th className="px-3 py-2.5 text-right">रकम (Amount)</th>
-                  <th className="px-3 py-2.5 text-right">बकाया (Balance)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E3DFD0]">
-                {ledger?.entries?.map((entry: any, idx: number) => {
-                  const isSale = entry.type === 'SALE';
-                  const isOpening = entry.type === 'OPENING';
-                  return (
-                    <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-3 py-2.5 font-bold text-gray-700 whitespace-nowrap">
-                        {formatDate(entry.date, 'd MMM')}
-                      </td>
-                      <td className="px-3 py-2.5 font-semibold text-gray-900">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={
-                              isSale
-                                ? 'text-blue-700 font-extrabold'
-                                : isOpening
-                                ? 'text-amber-700 font-extrabold'
-                                : 'text-emerald-700 font-extrabold'
-                            }
-                          >
-                            {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
-                          </span>
-                        </div>
-                        {entry.notes && (
-                          <span className="text-[10px] text-gray-500 block truncate max-w-[130px]">
-                            {entry.notes}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
-                        {entry.debit > 0 ? (
-                          <span className="text-gray-900">₹{paiseToRupees(entry.debit).toLocaleString('en-IN')}</span>
-                        ) : (
-                          <span className="text-emerald-700">₹{paiseToRupees(entry.credit).toLocaleString('en-IN')}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-black text-rose-700 whitespace-nowrap">
-                        ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          /* Cards View */
-          ledger?.entries?.map((entry: any, idx: number) => {
-            const isSale = entry.type === 'SALE';
-            return (
-              <div
-                key={idx}
-                className="bg-white border border-[#E3DFD0] rounded-xl p-3.5 shadow-2xs"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-sm text-[#1B2A1F]">
-                    {formatDate(entry.date, 'd MMM')}
-                  </span>
-                  <span
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                      isSale
-                        ? 'bg-[#E4EFE6] text-[#1F6B3A]'
-                        : 'bg-[#FBE9C8] text-[#6B4300]'
-                    }`}
-                  >
-                    {isSale ? `बिल #${entry.referenceId || ''}` : 'भुगतान / Payment'}
-                  </span>
-                </div>
-
-                <div className="text-xs text-[#5B6558] my-2 truncate">
-                  {entry.notes || (isSale ? 'सब्ज़ी बिक्री' : 'खाते में जमा')}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 border-t border-dashed border-[#D5D0BC] pt-2 text-xs">
-                  <div>
-                    <span className="text-gray-400 block text-[10px]">बिल / Bill</span>
-                    <span className="font-bold text-[#1B2A1F]">
-                      {entry.debit ? `₹${paiseToRupees(entry.debit).toLocaleString('en-IN')}` : '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 block text-[10px]">जमा / Paid</span>
-                    <span className="font-bold text-[#1F6B3A]">
-                      {entry.credit ? `₹${paiseToRupees(entry.credit).toLocaleString('en-IN')}` : '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 block text-[10px]">बाकी / Balance</span>
-                    <span className="font-bold text-[#B3261E]">
+      {ledger?.entries?.length === 0 ? (
+        <div className="c text-center py-6 text-sm text-gray-500">
+          कोई पुराना लेन-देन नहीं (No ledger entries)
+        </div>
+      ) : ledgerView === 'table' ? (
+        /* PRD 4.4 Table Format */
+        <div className="c p-0 overflow-hidden">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#E8EDE2] text-[#1B2A1F] font-bold">
+              <tr>
+                <th className="px-3 py-2.5">तारीख</th>
+                <th className="px-3 py-2.5">प्रविष्टि (Entry)</th>
+                <th className="px-3 py-2.5 text-right">रकम</th>
+                <th className="px-3 py-2.5 text-right">बकाया</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#DDE3D6]">
+              {ledger?.entries?.map((entry: any, idx: number) => {
+                const isSale = entry.type === 'SALE';
+                const isOpening = entry.type === 'OPENING';
+                return (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-3 py-2.5 font-semibold text-gray-700 whitespace-nowrap">
+                      {formatDate(entry.date, 'd MMM')}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={isSale ? 'font-bold text-[#1F6B45]' : isOpening ? 'font-bold text-amber-700' : 'font-bold text-emerald-700'}>
+                        {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
+                      </span>
+                      {entry.notes && (
+                        <span className="text-[10px] text-gray-500 block truncate max-w-[110px]">
+                          {entry.notes}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
+                      {entry.debit > 0 ? (
+                        <span>₹{paiseToRupees(entry.debit).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span className="text-emerald-700">₹{paiseToRupees(entry.credit).toLocaleString('en-IN')}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-black text-[#B4540A] whitespace-nowrap">
                       ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* Cards View */
+        ledger?.entries?.map((entry: any, idx: number) => {
+          const isSale = entry.type === 'SALE';
+          return (
+            <div key={idx} className="c">
+              <div className="r">
+                <span className="font-bold text-sm">
+                  {formatDate(entry.date, 'd MMM')} · {entry.referenceId || (isSale ? 'Bill' : 'Payment')}
+                </span>
+                <span className="d">
+                  Due ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
+                </span>
               </div>
-            );
-          })
-        )}
-      </div>
+              <div className="r text-xs">
+                <span className="m">
+                  {isSale ? 'Amount charged' : `Paid via ${entry.paymentMethod || 'cash'}`}
+                </span>
+                <b>
+                  {entry.debit > 0
+                    ? `+₹${paiseToRupees(entry.debit).toLocaleString('en-IN')}`
+                    : `−₹${paiseToRupees(entry.credit).toLocaleString('en-IN')}`}
+                </b>
+              </div>
+            </div>
+          );
+        })
+      )}
 
-      {/* Floating Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-[#E3DFD0] flex gap-2.5 max-w-md mx-auto z-40">
-        <button
-          onClick={() => setPaymentModalOpen(true)}
-          className="flex-1 min-h-[48px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-bold text-sm rounded-xl hover:bg-emerald-50 flex items-center justify-center gap-1.5 transition-colors"
-        >
-          <CreditCard className="w-4 h-4 text-emerald-600" />
-          <span>+ जमा लें (Receive Pay)</span>
-        </button>
-        <button
-          onClick={() => navigate('/sales/new')}
-          className="flex-1.2 min-h-[48px] bg-[#1F6B3A] hover:bg-[#18552e] text-white font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>नया बिल / New Bill</span>
-        </button>
-      </div>
-
-      {/* Edit Modal */}
-      <BuyerModal
-        isOpen={editModalOpen}
-        buyer={buyer}
-        onClose={() => setEditModalOpen(false)}
-        onSave={handleUpdate}
-      />
-
-      {/* Direct Payment Modal (PRD 4.3) */}
-      <PaymentModal
-        isOpen={paymentModalOpen}
-        defaultDirection="RECEIVED_FROM_BUYER"
-        initialBuyerId={buyerId}
-        onClose={() => setPaymentModalOpen(false)}
-        onSave={async (paymentData) => {
-          await createPayment(paymentData);
-          setPaymentModalOpen(false);
-          fetchData();
-        }}
-      />
+      {/* Edit Customer Modal */}
+      {editModalOpen && (
+        <BuyerModal
+          isOpen={editModalOpen}
+          buyer={buyer}
+          onClose={() => setEditModalOpen(false)}
+          onSave={async (formData) => {
+            await updateBuyer(buyerId, formData);
+            await fetchData();
+            setEditModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

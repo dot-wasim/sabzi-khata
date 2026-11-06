@@ -5,31 +5,24 @@ import { BossAuthProvider } from './context/BossAuthContext';
 import { SimulatorProvider } from './context/SimulatorContext';
 import { MacSimulator } from './components/MacSimulator';
 import { Layout } from './components/Layout';
-import { PrivateRoute, RoleRoute } from './components/PrivateRoute';
+import { PrivateRoute } from './components/PrivateRoute';
 import { BossRoute } from './components/BossRoute';
 
-// Pages
+// Pages matching User's Custom Design System
 import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { VegetableList } from './pages/vegetables/VegetableList';
-import { SellerList } from './pages/sellers/SellerList';
-import { SellerDetail } from './pages/sellers/SellerDetail';
+import { Home } from './pages/Home';
+import { SaleList } from './pages/sales/SaleList';
+import { SaleForm } from './pages/sales/SaleForm';
 import { BuyerList } from './pages/buyers/BuyerList';
 import { BuyerDetail } from './pages/buyers/BuyerDetail';
 import { PurchaseList } from './pages/purchases/PurchaseList';
 import { PurchaseForm } from './pages/purchases/PurchaseForm';
-import { PurchaseDetail } from './pages/purchases/PurchaseDetail';
-import { SaleList } from './pages/sales/SaleList';
-import { SaleForm } from './pages/sales/SaleForm';
-import { SaleDetail } from './pages/sales/SaleDetail';
-import { PaymentList } from './pages/payments/PaymentList';
-import { StockView } from './pages/stock/StockView';
-import { WastageList } from './pages/wastage/WastageList';
-import { ExpenseList } from './pages/expenses/ExpenseList';
-import { ProfitReport } from './pages/reports/ProfitReport';
-import { AuditLogView } from './pages/reports/AuditLogView';
+import { SellerList } from './pages/sellers/SellerList';
+import { SellerDetail } from './pages/sellers/SellerDetail';
+import { VegetableList } from './pages/vegetables/VegetableList';
+import { Dashboard } from './pages/Dashboard';
+import { BackupAccount } from './pages/settings/BackupAccount';
 import { ChangePassword } from './pages/settings/ChangePassword';
-import { AccountList } from './pages/accounts/AccountList';
 
 export const App: React.FC = () => {
   return (
@@ -44,46 +37,40 @@ export const App: React.FC = () => {
                 {/* Authenticated Routes wrapped in Layout */}
                 <Route element={<PrivateRoute />}>
                   <Route element={<Layout />}>
-                    {/* Default to System 1 (Buyer UI) */}
-                    <Route path="/" element={<Navigate to="/sales" replace />} />
+                    {/* Main Home Screen (Hussain Foods overview) */}
+                    <Route path="/" element={<Home />} />
 
-                    {/* System 1: Buyer UI & Counter Sales (Active & Focused) */}
+                    {/* Sell Desk */}
                     <Route path="/sales" element={<SaleList />} />
                     <Route path="/sales/new" element={<SaleForm />} />
-                    <Route path="/sales/:id" element={<SaleDetail />} />
+                    <Route path="/sales/:id" element={<SaleForm />} />
                     <Route path="/sales/:id/edit" element={<SaleForm />} />
                     <Route path="/buyers" element={<BuyerList />} />
                     <Route path="/buyers/:id" element={<BuyerDetail />} />
 
-                    {/* System 2: Buy Desk & Mandi Operations (Accessible to Father & Brother) */}
+                    {/* Buy Desk */}
                     <Route path="/purchases" element={<PurchaseList />} />
                     <Route path="/purchases/new" element={<PurchaseForm />} />
-                    <Route path="/purchases/:id" element={<PurchaseDetail />} />
+                    <Route path="/purchases/:id" element={<PurchaseForm />} />
                     <Route path="/purchases/:id/edit" element={<PurchaseForm />} />
                     <Route path="/sellers" element={<SellerList />} />
                     <Route path="/sellers/:id" element={<SellerDetail />} />
 
-                    {/* Shared Vegetable Management (Accessible by Sell, Buy & Boss Systems) */}
+                    {/* Vegetables & Crate Weights */}
                     <Route path="/vegetables" element={<VegetableList />} />
 
-                    {/* General Settings */}
-                    <Route path="/settings/password" element={<ChangePassword />} />
-
-                    {/* System 3: Boss Desk & Financial Evaluations (Protected by PIN via BossRoute) */}
+                    {/* Boss Desk (PIN Protected) */}
                     <Route element={<BossRoute />}>
                       <Route path="/boss" element={<Dashboard />} />
-                      <Route path="/accounts" element={<AccountList />} />
-                      <Route path="/stock" element={<StockView />} />
-                      <Route path="/payments" element={<PaymentList />} />
-                      <Route path="/wastage" element={<WastageList />} />
-                      <Route path="/expenses" element={<ExpenseList />} />
-                      <Route path="/reports" element={<ProfitReport />} />
-                      <Route path="/audit-log" element={<AuditLogView />} />
                     </Route>
+
+                    {/* Backup & Settings */}
+                    <Route path="/settings/backup" element={<BackupAccount />} />
+                    <Route path="/settings/password" element={<ChangePassword />} />
                   </Route>
                 </Route>
 
-                <Route path="*" element={<Navigate to="/sales" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </MacSimulator>
           </BrowserRouter>

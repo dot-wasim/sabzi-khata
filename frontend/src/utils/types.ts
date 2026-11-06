@@ -2,6 +2,7 @@ export interface User {
   id: number;
   username: string;
   name: string;
+  phone?: string;
   role: 'OWNER' | 'MARKET_ENTRY';
 }
 
@@ -35,6 +36,8 @@ export interface Vegetable {
   unit: string;
   category: string | null;
   defaultCrateKg?: number;
+  crateWeightKg?: number;
+  defaultRate?: number;
   active: boolean;
 }
 
