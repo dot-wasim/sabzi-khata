@@ -182,6 +182,14 @@ export const PurchaseForm: React.FC = () => {
   const balanceDueRupees = Math.max(0, goodsTotalRupees - paidRupees);
 
   const selectedSeller = sellers.find((s) => s.id === Number(sellerId));
+  const rawSellerDue = selectedSeller
+    ? (selectedSeller.currentBalance !== undefined
+        ? selectedSeller.currentBalance
+        : selectedSeller.currentDue !== undefined
+        ? selectedSeller.currentDue
+        : selectedSeller.openingBalance) || 0
+    : 0;
+  const previousSellerBalanceRupees = paiseToRupees(rawSellerDue);
 
   const handleCreateSeller = async (formData: any) => {
     try {
@@ -360,6 +368,20 @@ _Hussain Foods - Sabzi Mandi_`;
             + नया
           </button>
         </div>
+
+        {selectedSeller && (
+          <div className="bg-emerald-50/80 border-2 border-emerald-300 rounded-xl p-3.5 -mt-1 flex justify-between items-center text-sm shadow-xs">
+            <div>
+              <span className="text-gray-800 font-extrabold block">
+                {selectedSeller.name} का पिछला बाकी
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">Old Payable Balance</span>
+            </div>
+            <span className="text-rose-600 font-black text-xl">
+              ₹{previousSellerBalanceRupees.toLocaleString('en-IN')}
+            </span>
+          </div>
+        )}
 
         {/* Date & Vehicle Number Inputs */}
         <div className="flex gap-2">
@@ -600,6 +622,28 @@ _Hussain Foods - Sabzi Mandi_`;
             <span>+ सब्ज़ी जोड़ें / Add vegetable</span>
           </button>
         </div>
+
+        {/* Real-Time Live Bill & Due Summary Card right at Items */}
+        {goodsTotalRupees > 0 && (
+          <div className="bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold text-emerald-900">
+              <span>इस खरीद का सामान कुल (Goods Total):</span>
+              <span className="text-sm font-black text-gray-900">₹{goodsTotalRupees.toLocaleString('en-IN')}</span>
+            </div>
+            {selectedSeller && (
+              <div className="flex justify-between items-center text-xs font-bold text-emerald-900">
+                <span>{selectedSeller.name} का पिछला बाकी (Old Due):</span>
+                <span className="text-sm font-black text-rose-600">₹{previousSellerBalanceRupees.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-emerald-200 flex justify-between items-center font-black">
+              <span className="text-sm text-emerald-950">नया कुल किसान बकाया (Total Due):</span>
+              <span className="text-xl font-black text-rose-600">
+                ₹{(previousSellerBalanceRupees + balanceDueRupees).toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Transport & Labour */}
         <div className="flex gap-2">

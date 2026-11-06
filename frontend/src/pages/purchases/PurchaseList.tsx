@@ -108,8 +108,11 @@ export const PurchaseList: React.FC = () => {
       .filter((pay) => filterByPeriod(pay.date))
       .reduce((sum, pay) => sum + (pay.amount || 0), 0);
 
+  const getSellerDue = (s: any) =>
+    (s.currentBalance !== undefined ? s.currentBalance : s.currentDue) || s.openingBalance || 0;
+
   const totalFarmerPayables = sellers.reduce(
-    (sum, s) => sum + ((s.currentBalance !== undefined ? s.currentBalance : s.openingBalance) || 0),
+    (sum, s) => sum + getSellerDue(s),
     0
   );
 
@@ -162,9 +165,7 @@ export const PurchaseList: React.FC = () => {
 
   const sendSellerStatementWhatsApp = (e: React.MouseEvent, seller: any) => {
     e.stopPropagation();
-    const dueRupees = Math.round(
-      ((seller.currentBalance !== undefined ? seller.currentBalance : seller.openingBalance || 0)) / 100
-    );
+    const dueRupees = Math.round(getSellerDue(seller) / 100);
     const message =
       `नमस्ते ${seller.name} जी,\n\n` +
       `हुसैन फूड्स (सब्जी मंडी) से आपका कुल हिसाब देनदारी *₹${dueRupees.toLocaleString('en-IN')}* दर्ज है।\n` +
@@ -192,7 +193,7 @@ export const PurchaseList: React.FC = () => {
 
   // Filtered Sellers
   const filteredSellers = sellers.filter((s) => {
-    const due = (s.currentBalance !== undefined ? s.currentBalance : s.openingBalance) || 0;
+    const due = getSellerDue(s);
     if (onlyWithDues && due <= 0) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -331,7 +332,7 @@ export const PurchaseList: React.FC = () => {
               <CurrencyDisplay amount={totalFarmerPayables} />
             </div>
             <span className="text-[11px] text-amber-200/80 mt-0.5 block">
-              {sellers.filter((s) => ((s.currentBalance !== undefined ? s.currentBalance : s.openingBalance) || 0) > 0).length} किसानों/व्यापारियों को देना बाकी
+              {sellers.filter((s) => getSellerDue(s) > 0).length} किसानों/व्यापारियों को देना बाकी
             </span>
           </div>
         </div>
@@ -535,7 +536,7 @@ export const PurchaseList: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {filteredSellers.map((s: any) => {
-              const due = (s.currentBalance !== undefined ? s.currentBalance : s.openingBalance) || 0;
+              const due = getSellerDue(s);
               const hasDue = due > 0;
 
               return (

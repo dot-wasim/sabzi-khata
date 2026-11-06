@@ -167,9 +167,14 @@ export const SaleForm: React.FC = () => {
   const thisBillDueRupees = Math.max(0, netTotalRupees - receivedRupees);
 
   const selectedBuyer = buyers.find((b) => b.id === Number(buyerId));
-  const previousBalanceRupees = selectedBuyer
-    ? paiseToRupees(selectedBuyer.currentBalance || 0)
+  const rawBuyerDue = selectedBuyer
+    ? (selectedBuyer.currentBalance !== undefined
+        ? selectedBuyer.currentBalance
+        : selectedBuyer.currentDue !== undefined
+        ? selectedBuyer.currentDue
+        : selectedBuyer.openingBalance) || 0
     : 0;
+  const previousBalanceRupees = paiseToRupees(rawBuyerDue);
   const totalKhataDueRupees = previousBalanceRupees + thisBillDueRupees;
 
   const handleCreateBuyer = async (formData: any) => {
@@ -346,9 +351,14 @@ _Thank you for your business!_`;
           </div>
 
           {selectedBuyer && (
-            <div className="bg-white border border-[#E3DFD0] rounded-xl p-3 mt-2 flex justify-between items-center text-sm shadow-2xs">
-              <span className="text-gray-500 font-medium">पिछला बाकी / Previous balance</span>
-              <span className="text-[#B3261E] font-bold text-base">
+            <div className="bg-amber-50/80 border-2 border-amber-300 rounded-xl p-3.5 mt-2 flex justify-between items-center text-sm shadow-xs">
+              <div>
+                <span className="text-gray-800 font-extrabold block">
+                  {selectedBuyer.name} का पिछला बाकी
+                </span>
+                <span className="text-[11px] text-gray-500 font-medium">Old Khata Balance</span>
+              </div>
+              <span className="text-rose-600 font-black text-xl">
                 ₹{previousBalanceRupees.toLocaleString('en-IN')}
               </span>
             </div>
@@ -589,6 +599,28 @@ _Thank you for your business!_`;
             <span>+ सामान जोड़ें / Add item</span>
           </button>
         </div>
+
+        {/* Real-Time Live Bill & Due Summary Card right at Items */}
+        {subtotalRupees > 0 && (
+          <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold text-amber-900">
+              <span>इस बिल का सामान कुल (Items Total):</span>
+              <span className="text-sm font-black text-gray-900">₹{subtotalRupees.toLocaleString('en-IN')}</span>
+            </div>
+            {selectedBuyer && (
+              <div className="flex justify-between items-center text-xs font-bold text-amber-900">
+                <span>{selectedBuyer.name} का पिछला बाकी (Old Due):</span>
+                <span className="text-sm font-black text-rose-600">₹{previousBalanceRupees.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-amber-200 flex justify-between items-center font-black">
+              <span className="text-sm text-amber-950">नया कुल बकाया खाता (Total Due):</span>
+              <span className="text-xl font-black text-rose-600">
+                ₹{(previousBalanceRupees + netTotalRupees).toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Deductions & Returns Card */}
         <div className="bg-white border border-[#E3DFD0] rounded-xl p-3.5 shadow-2xs">

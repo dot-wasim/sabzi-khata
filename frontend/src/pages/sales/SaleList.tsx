@@ -111,8 +111,11 @@ export const SaleList: React.FC = () => {
     periodSales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
     periodPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
+  const getBuyerDue = (b: any) =>
+    (b.currentBalance !== undefined ? b.currentBalance : b.currentDue) || b.openingBalance || 0;
+
   const totalMarketDues = buyers.reduce(
-    (sum, b) => sum + ((b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0),
+    (sum, b) => sum + getBuyerDue(b),
     0
   );
 
@@ -166,9 +169,7 @@ export const SaleList: React.FC = () => {
 
   const sendDueReminderWhatsApp = (e: React.MouseEvent, buyer: any) => {
     e.stopPropagation();
-    const dueRupees = Math.round(
-      ((buyer.currentDue !== undefined ? buyer.currentDue : buyer.openingBalance || 0)) / 100
-    );
+    const dueRupees = Math.round(getBuyerDue(buyer) / 100);
     const message =
       `नमस्ते ${buyer.name} जी,\n\n` +
       `हुसैन फूड्स (सब्जी मंडी) से आपका पिछला बकाया हिसाब *₹${dueRupees.toLocaleString('en-IN')}* है।\n` +
@@ -202,7 +203,7 @@ export const SaleList: React.FC = () => {
 
   // Filtered Buyers
   const filteredBuyers = buyers.filter((b) => {
-    const due = (b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0;
+    const due = getBuyerDue(b);
     if (onlyWithDues && due <= 0) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -334,7 +335,7 @@ export const SaleList: React.FC = () => {
               <CurrencyDisplay amount={totalMarketDues} />
             </div>
             <span className="text-[11px] text-rose-200/80 mt-0.5 block">
-              {buyers.filter((b) => ((b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0) > 0).length} खरीदारों पर बकाया
+              {buyers.filter((b) => getBuyerDue(b) > 0).length} खरीदारों पर बकाया
             </span>
           </div>
         </div>
@@ -523,7 +524,7 @@ export const SaleList: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {filteredBuyers.map((b: any) => {
-              const due = (b.currentDue !== undefined ? b.currentDue : b.openingBalance) || 0;
+              const due = getBuyerDue(b);
               const hasDue = due > 0;
 
               return (

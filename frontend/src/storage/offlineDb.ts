@@ -161,11 +161,32 @@ export const offlineDb = {
   // Buyers / Customers
   getBuyers: async (search?: string) => {
     let all = getCollection<any>(STORAGE_KEYS.BUYERS);
-    // Ensure all buyers have currentBalance populated
-    all = all.map((b) => ({
-      ...b,
-      currentBalance: b.currentDue !== undefined ? b.currentDue : (b.openingBalance || 0),
-    }));
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+
+    // Compute dynamic, accurate live balances for every buyer
+    all = all.map((b) => {
+      const bSales = sales.filter((s) => s.buyerId === b.id);
+      const totalSold = bSales.reduce((sum, s) => {
+        const sub = (s.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+        return sum + Math.max(0, sub - (s.deductionAmount || 0));
+      }, 0);
+      const totalReceived = bSales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
+        payments.filter((p) => p.buyerId === b.id && (p.direction === 'IN' || p.direction === 'RECEIVED_FROM_BUYER'))
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const computedDue = (b.openingBalance || 0) + totalSold - totalReceived;
+      const due = b.currentDue !== undefined ? b.currentDue : computedDue;
+
+      return {
+        ...b,
+        currentBalance: due,
+        currentDue: due,
+        totalSold,
+        totalReceived,
+      };
+    });
+
     if (search) {
       const q = search.toLowerCase();
       all = all.filter((b) => b.name?.toLowerCase().includes(q) || b.phone?.includes(q));
@@ -177,16 +198,22 @@ export const offlineDb = {
     const all = getCollection<any>(STORAGE_KEYS.BUYERS);
     const buyer = all.find((b) => b.id === id);
     const sales = getCollection<any>(STORAGE_KEYS.SALES).filter((s) => s.buyerId === id);
-    
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS).filter(
+      (p) => p.buyerId === id && (p.direction === 'IN' || p.direction === 'RECEIVED_FROM_BUYER')
+    );
+
     const totalSold = sales.reduce((sum, s) => {
       const sub = (s.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
       return sum + Math.max(0, sub - (s.deductionAmount || 0));
     }, 0);
-    const totalReceived = sales.reduce((sum, s) => sum + (s.receivedNow || 0), 0);
-    const balanceReceivable = (buyer?.currentDue !== undefined ? buyer.currentDue : buyer?.openingBalance) || 0;
+    const totalReceived = sales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
+      payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    const computedDue = (buyer?.openingBalance || 0) + totalSold - totalReceived;
+    const balanceReceivable = buyer?.currentDue !== undefined ? buyer.currentDue : computedDue;
 
     return {
-      buyer: buyer ? { ...buyer, currentBalance: balanceReceivable } : null,
+      buyer: buyer ? { ...buyer, currentBalance: balanceReceivable, currentDue: balanceReceivable } : null,
       sales,
       totalSold,
       totalReceived,
@@ -310,6 +337,7 @@ export const offlineDb = {
       notes: data.notes || '',
       openingBalance: data.openingBalance || 0,
       currentDue: data.openingBalance || 0,
+      currentBalance: data.openingBalance || 0,
       active: true,
     };
     all.push(newBuyer);
@@ -320,10 +348,31 @@ export const offlineDb = {
   // Sellers / Mandi Farmers
   getSellers: async (search?: string) => {
     let all = getCollection<any>(STORAGE_KEYS.SELLERS);
-    all = all.map((s) => ({
-      ...s,
-      currentBalance: s.currentDue !== undefined ? s.currentDue : (s.openingBalance || 0),
-    }));
+    const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES);
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS);
+
+    all = all.map((s) => {
+      const sPurchases = purchases.filter((p) => p.sellerId === s.id);
+      const totalPurchased = sPurchases.reduce((sum, p) => {
+        const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+        return sum + goods + (p.transport || 0) + (p.labour || 0);
+      }, 0);
+      const totalPaid = sPurchases.reduce((sum, p) => sum + (p.paidNow || 0), 0) +
+        payments.filter((p) => p.sellerId === s.id && (p.direction === 'OUT' || p.direction === 'PAID_TO_SELLER'))
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const computedDue = (s.openingBalance || 0) + totalPurchased - totalPaid;
+      const due = s.currentDue !== undefined ? s.currentDue : computedDue;
+
+      return {
+        ...s,
+        currentBalance: due,
+        currentDue: due,
+        totalPurchased,
+        totalPaid,
+      };
+    });
+
     if (search) {
       const q = search.toLowerCase();
       all = all.filter((s) => s.name?.toLowerCase().includes(q) || s.village?.toLowerCase().includes(q));
@@ -335,16 +384,22 @@ export const offlineDb = {
     const all = getCollection<any>(STORAGE_KEYS.SELLERS);
     const seller = all.find((s) => s.id === id);
     const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES).filter((p) => p.sellerId === id);
+    const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS).filter(
+      (p) => p.sellerId === id && (p.direction === 'OUT' || p.direction === 'PAID_TO_SELLER')
+    );
 
     const totalPurchased = purchases.reduce((sum, p) => {
       const goods = (p.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
-      return sum + goods;
+      return sum + goods + (p.transport || 0) + (p.labour || 0);
     }, 0);
-    const totalPaid = purchases.reduce((sum, p) => sum + (p.paidNow || 0), 0);
-    const currentBalance = (seller?.currentDue !== undefined ? seller.currentDue : seller?.openingBalance) || 0;
+    const totalPaid = purchases.reduce((sum, p) => sum + (p.paidNow || 0), 0) +
+      payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    const computedDue = (seller?.openingBalance || 0) + totalPurchased - totalPaid;
+    const currentBalance = seller?.currentDue !== undefined ? seller.currentDue : computedDue;
 
     return {
-      seller: seller ? { ...seller, currentBalance } : null,
+      seller: seller ? { ...seller, currentBalance, currentDue: currentBalance } : null,
       purchases,
       totalPurchased,
       totalPaid,
@@ -463,6 +518,7 @@ export const offlineDb = {
       isOwnFarmer: Boolean(data.isOwnFarmer),
       openingBalance: data.openingBalance || 0,
       currentDue: data.openingBalance || 0,
+      currentBalance: data.openingBalance || 0,
       active: true,
     };
     all.push(newSeller);
@@ -673,7 +729,9 @@ export const offlineDb = {
     if (direction === 'IN' && data.buyerId) {
       const buyer = buyers.find((b) => b.id === Number(data.buyerId));
       if (buyer) {
-        buyer.currentDue = Math.max(0, (buyer.currentDue || 0) - amount);
+        const prevDue = (buyer.currentDue !== undefined ? buyer.currentDue : buyer.openingBalance || 0);
+        buyer.currentDue = Math.max(0, prevDue - amount);
+        buyer.currentBalance = buyer.currentDue;
         saveCollection(STORAGE_KEYS.BUYERS, buyers);
       }
       const acc = accounts.find((a) => a.id === accountId);
@@ -685,7 +743,9 @@ export const offlineDb = {
       // If OUT (paid to seller), reduce seller due & decrease account balance
       const seller = sellers.find((s) => s.id === Number(data.sellerId));
       if (seller) {
-        seller.currentDue = Math.max(0, (seller.currentDue || 0) - amount);
+        const prevDue = (seller.currentDue !== undefined ? seller.currentDue : seller.openingBalance || 0);
+        seller.currentDue = Math.max(0, prevDue - amount);
+        seller.currentBalance = seller.currentDue;
         saveCollection(STORAGE_KEYS.SELLERS, sellers);
       }
       const acc = accounts.find((a) => a.id === accountId);
@@ -752,7 +812,9 @@ export const offlineDb = {
 
     // Update buyer due
     if (buyer) {
-      buyer.currentDue = (buyer.currentDue || 0) + balanceDue;
+      const prevDue = (buyer.currentDue !== undefined ? buyer.currentDue : buyer.openingBalance || 0);
+      buyer.currentDue = prevDue + balanceDue;
+      buyer.currentBalance = buyer.currentDue;
       saveCollection(STORAGE_KEYS.BUYERS, buyers);
     }
 
@@ -821,7 +883,9 @@ export const offlineDb = {
 
     // Update seller due
     if (seller) {
-      seller.currentDue = (seller.currentDue || 0) + balanceDue;
+      const prevDue = (seller.currentDue !== undefined ? seller.currentDue : seller.openingBalance || 0);
+      seller.currentDue = prevDue + balanceDue;
+      seller.currentBalance = seller.currentDue;
       saveCollection(STORAGE_KEYS.SELLERS, sellers);
     }
 

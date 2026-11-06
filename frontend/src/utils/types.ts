@@ -48,6 +48,7 @@ export interface Seller {
   openingBalance: number;
   active: boolean;
   currentBalance?: number;
+  currentDue?: number;
   totalPurchased?: number;
   totalPaid?: number;
 }

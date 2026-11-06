@@ -39,12 +39,12 @@ export const BuyerList: React.FC = () => {
   };
 
   // Metrics
-  const totalReceivable = buyers.reduce(
-    (sum, b) => sum + Math.max(0, b.currentBalance || 0),
-    0
-  );
-  const totalDueCount = buyers.filter((b) => (b.currentBalance || 0) > 0).length;
-  const totalClearCount = buyers.filter((b) => (b.currentBalance || 0) <= 0).length;
+  const getDue = (b: any) =>
+    (b.currentBalance !== undefined ? b.currentBalance : b.currentDue) || b.openingBalance || 0;
+
+  const totalReceivable = buyers.reduce((sum, b) => sum + Math.max(0, getDue(b)), 0);
+  const totalDueCount = buyers.filter((b) => getDue(b) > 0).length;
+  const totalClearCount = buyers.filter((b) => getDue(b) <= 0).length;
 
   const filtered = buyers.filter((b) => {
     const matchesSearch =
@@ -55,8 +55,8 @@ export const BuyerList: React.FC = () => {
 
     if (!matchesSearch) return false;
 
-    if (filterMode === 'due') return (b.currentBalance || 0) > 0;
-    if (filterMode === 'clear') return (b.currentBalance || 0) <= 0;
+    if (filterMode === 'due') return getDue(b) > 0;
+    if (filterMode === 'clear') return getDue(b) <= 0;
     return true;
   });
 
@@ -154,7 +154,7 @@ export const BuyerList: React.FC = () => {
           </div>
         ) : (
           filtered.map((buyer) => {
-            const duePaise = buyer.currentBalance || 0;
+            const duePaise = getDue(buyer);
             const isDue = duePaise > 0;
 
             return (
