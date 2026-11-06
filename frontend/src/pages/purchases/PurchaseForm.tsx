@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getSellers, createSeller } from '../../api/sellers';
 import { getVegetables } from '../../api/vegetables';
 import { getAccounts } from '../../api/accounts';
-import { createPurchase, getPurchase, updatePurchase } from '../../api/purchases';
+import { createPurchase, getPurchase, updatePurchase, getPurchases } from '../../api/purchases';
 import { Seller, Vegetable, Account } from '../../utils/types';
 import { SellerModal } from '../sellers/SellerModal';
 import { VegetableModal } from '../vegetables/VegetableModal';
@@ -16,7 +16,12 @@ import {
   Check,
   Truck,
   Carrot,
-  Share2
+  Share2,
+  Camera,
+  Printer,
+  Image,
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 
 interface FormLineItem {
@@ -27,6 +32,15 @@ interface FormLineItem {
   crateCount?: string;
   kgPerCrate?: string;
   isTomatoCrateMode?: boolean;
+}
+
+interface BadGoodsLineItem {
+  vegetableId: number;
+  quantity: string;
+  unit: string;
+  rateRupees: string;
+  reason: string;
+  photoUrl?: string;
 }
 
 export const PurchaseForm: React.FC = () => {
@@ -59,6 +73,11 @@ export const PurchaseForm: React.FC = () => {
   const [labourRupees, setLabourRupees] = useState('100');
   const [isChemicalFree, setIsChemicalFree] = useState(false);
 
+  // Bad-condition Goods Deduction (PRD 5.4)
+  const [badGoods, setBadGoods] = useState<BadGoodsLineItem[]>([]);
+  const [slipPhotoUrl, setSlipPhotoUrl] = useState('');
+  const [nextEntryNo, setNextEntryNo] = useState<number>(1);
+
   // Payment
   const [paidNowRupees, setPaidNowRupees] = useState('');
   const [accountId, setAccountId] = useState<number | ''>('');
@@ -68,15 +87,20 @@ export const PurchaseForm: React.FC = () => {
     const init = async () => {
       setLoading(true);
       try {
-        const [sellersRes, vegData, accData] = await Promise.all([
+        const [sellersRes, vegData, accData, purchasesRes] = await Promise.all([
           getSellers(),
           getVegetables(),
           getAccounts(),
+          getPurchases({ limit: 500 }).catch(() => ({ purchases: [] })),
         ]);
         const sellersList = (sellersRes as any).sellers || sellersRes || [];
         setSellers(sellersList);
         setVegetables(vegData);
         setAccounts(accData);
+
+        const pList = (purchasesRes as any).purchases || [];
+        const maxEntry = pList.reduce((m: number, p: any) => Math.max(m, p.entryNo || 0), 0);
+        setNextEntryNo(maxEntry > 0 ? maxEntry + 1 : pList.length + 1);
 
         const defaultAcc = accData.find((a) => a.isDefault) || accData[0];
         if (defaultAcc && !isEdit) {
@@ -98,12 +122,28 @@ export const PurchaseForm: React.FC = () => {
             setTransportFlatRupees(String(paiseToRupees(p.transport || 0)));
           }
           setTransporterName(p.transporterName || '');
+          if ((p as any).photoUrl) {
+            setSlipPhotoUrl((p as any).photoUrl);
+          }
+          if ((p as any).badGoodsDeductions && (p as any).badGoodsDeductions.length > 0) {
+            setBadGoods(
+              (p as any).badGoodsDeductions.map((d: any) => ({
+                vegetableId: d.vegetableId || 0,
+                quantity: String(d.quantity || ''),
+                unit: d.unit || 'kg',
+                rateRupees: String(paiseToRupees(d.rate || 0)),
+                reason: d.reason || '',
+                photoUrl: d.photoUrl || '',
+              }))
+            );
+          }
           setItems(
             p.items.map((it: any) => ({
               vegetableId: it.vegetableId,
               quantity: String(it.quantity),
               unit: it.unit,
               rateRupees: String(paiseToRupees(it.rate)),
+              kgPerCrate: it.crateWeightKg ? String(it.crateWeightKg) : '25',
             }))
           );
         } else if (sellersList.length > 0) {
@@ -160,6 +200,35 @@ export const PurchaseForm: React.FC = () => {
     setItems(updated);
   };
 
+  const handleAddBadGoods = () => {
+    setBadGoods((prev) => [
+      ...prev,
+      { vegetableId: 0, quantity: '', unit: 'kg', rateRupees: '', reason: 'सड़ा / खराब माल (Damaged)' },
+    ]);
+  };
+
+  const handleRemoveBadGoods = (idx: number) => {
+    setBadGoods((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleBadGoodsChange = (idx: number, field: keyof BadGoodsLineItem, val: any) => {
+    const updated = [...badGoods];
+    (updated[idx] as any)[field] = val;
+    setBadGoods(updated);
+  };
+
+  const handleSlipPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setSlipPhotoUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Calculations
   const lineTotals = items.map((it) => {
     const q = parseFloat(it.quantity) || 0;
@@ -170,6 +239,16 @@ export const PurchaseForm: React.FC = () => {
   const goodsTotalRupees = lineTotals.reduce((sum, val) => sum + val, 0);
   const totalItemQty = items.reduce((sum, it) => sum + (parseFloat(it.quantity) || 0), 0);
 
+  // Bad-condition Goods Deductions (PRD 5.4)
+  const badGoodsTotalRupees = badGoods.reduce((sum, it) => {
+    const q = parseFloat(it.quantity) || 0;
+    const r = parseFloat(it.rateRupees) || 0;
+    return sum + q * r;
+  }, 0);
+
+  // Net payable to supplier for goods after bad goods deduction
+  const netPayableToSellerRupees = Math.max(0, goodsTotalRupees - badGoodsTotalRupees);
+
   const calculatedTransportRupees =
     transportType === 'PER_UNIT'
       ? totalItemQty * (parseFloat(transportRateRupees) || 0)
@@ -179,7 +258,7 @@ export const PurchaseForm: React.FC = () => {
   const totalLandedRupees = goodsTotalRupees + calculatedTransportRupees + labourCostRupees;
 
   const paidRupees = parseFloat(paidNowRupees) || 0;
-  const balanceDueRupees = Math.max(0, goodsTotalRupees - paidRupees);
+  const balanceDueRupees = Math.max(0, netPayableToSellerRupees - paidRupees);
 
   const selectedSeller = sellers.find((s) => s.id === Number(sellerId));
   const rawSellerDue = selectedSeller
@@ -222,6 +301,21 @@ export const PurchaseForm: React.FC = () => {
     setSaving(true);
     try {
       const selectedAcc = accounts.find((a) => a.id === Number(accountId));
+      const validBadGoods = badGoods
+        .filter((d) => d.vegetableId > 0 && parseFloat(d.quantity) > 0 && parseFloat(d.rateRupees) > 0)
+        .map((d) => {
+          const v = vegetables.find((veg) => veg.id === Number(d.vegetableId));
+          return {
+            vegetableId: Number(d.vegetableId),
+            vegetableName: v?.nameHi || v?.nameEn,
+            quantity: parseFloat(d.quantity),
+            unit: d.unit,
+            rate: rupeesToPaise(d.rateRupees),
+            reason: d.reason || 'खराब माल',
+            photoUrl: d.photoUrl,
+          };
+        });
+
       const payload: any = {
         date,
         sellerId: Number(sellerId),
@@ -237,6 +331,10 @@ export const PurchaseForm: React.FC = () => {
         labour: rupeesToPaise(labourCostRupees),
         commission: 0,
         paidAmount: rupeesToPaise(paidRupees),
+        paidNow: rupeesToPaise(paidRupees),
+        photoUrl: slipPhotoUrl || undefined,
+        badGoodsDeductions: validBadGoods,
+        badGoodsTotal: rupeesToPaise(badGoodsTotalRupees),
         notes: [
           vehicleNumber ? `गाड़ी: ${vehicleNumber}` : '',
           isChemicalFree ? 'बिना केमिकल (अपना खेत)' : '',
@@ -244,12 +342,19 @@ export const PurchaseForm: React.FC = () => {
         ]
           .filter(Boolean)
           .join(' | ') || undefined,
-        items: validItems.map((it) => ({
-          vegetableId: Number(it.vegetableId),
-          quantity: parseFloat(it.quantity),
-          unit: it.unit,
-          rate: rupeesToPaise(it.rateRupees),
-        })),
+        items: validItems.map((it) => {
+          const qty = parseFloat(it.quantity) || 0;
+          const isCrate = it.unit === 'crate';
+          const crateKg = isCrate ? (parseFloat(it.kgPerCrate || '25') || 25) : undefined;
+          return {
+            vegetableId: Number(it.vegetableId),
+            quantity: qty,
+            unit: it.unit,
+            rate: rupeesToPaise(it.rateRupees),
+            crateWeightKg: crateKg,
+            convertedKg: isCrate && crateKg ? qty * crateKg : qty,
+          };
+        }),
       };
 
       if (isEdit) {
@@ -272,25 +377,44 @@ export const PurchaseForm: React.FC = () => {
       .map((it) => {
         const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
         const lineTotal = (parseFloat(it.quantity) || 0) * (parseFloat(it.rateRupees) || 0);
-        return `• ${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} (${it.quantity} ${it.unit} @ ₹${it.rateRupees}/${it.unit}) = ₹${lineTotal}`;
+        return `• ${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} (${it.quantity} ${it.unit} @ ₹${it.rateRupees}/${it.unit}) = ₹${lineTotal.toLocaleString('en-IN')}`;
       })
       .join('\n');
 
-    const msg = `*Hussain Foods — Mandi Purchase Slip (मंडी खरीद पर्ची)*
-Date: ${formatDate(date, 'dd/MM/yyyy')}
-Farmer/Seller: ${sellerName}${selectedSeller?.village ? ` (${selectedSeller.village})` : ''}
-${vehicleNumber ? `Vehicle: ${vehicleNumber}\n` : ''}
-*Items:*
-${itemsText}
+    const badGoodsText = badGoods
+      .filter((d) => d.vegetableId > 0)
+      .map((d) => {
+        const veg = vegetables.find((v) => v.id === Number(d.vegetableId));
+        const total = (parseFloat(d.quantity) || 0) * (parseFloat(d.rateRupees) || 0);
+        return `• [खराब माल] ${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'}: ${d.quantity} ${d.unit} @ ₹${d.rateRupees} = −₹${total.toLocaleString('en-IN')} (${d.reason})`;
+      })
+      .join('\n');
 
-*Vegetables Total:* ₹${goodsTotalRupees}
-${calculatedTransportRupees > 0 ? `*Transport (भाड़ा):* ₹${calculatedTransportRupees}\n` : ''}${labourCostRupees > 0 ? `*Labour (मजदूरी):* ₹${labourCostRupees}\n` : ''}*Net Total:* ₹${totalLandedRupees}
-*Paid Amount:* ₹${paidRupees}
-*Balance Due:* ₹${balanceDueRupees}
+    const cleanPhone = selectedSeller?.phone ? selectedSeller.phone.replace(/[^0-9]/g, '') : '';
+    const msg = `*हुसैन फूड्स (सब्जी मंडी)*
+मंडी खरीद पर्ची #${isEdit ? id : nextEntryNo}
+तारीख: ${formatDate(date, 'dd/MM/yyyy')}
+किसान/विक्रेता: ${sellerName} ${selectedSeller?.village ? `(${selectedSeller.village})` : ''}
+${vehicleNumber ? `गाड़ी नंबर: ${vehicleNumber}\n` : ''}----------------------------------
+*खरीदी गई सब्जियां:*
+${itemsText}
+${badGoodsText ? `----------------------------------\n*खराब माल कटौती (Deductions):*\n${badGoodsText}\n` : ''}----------------------------------
+*कुल माल (Goods Total):* ₹${goodsTotalRupees.toLocaleString('en-IN')}
+${badGoodsTotalRupees > 0 ? `*खराब माल कटौती:* −₹${badGoodsTotalRupees.toLocaleString('en-IN')}\n` : ''}*देय माल रकम (Net Payable):* ₹${netPayableToSellerRupees.toLocaleString('en-IN')}
+*पिछला बकाया (Old Due):* ₹${previousSellerBalanceRupees.toLocaleString('en-IN')}
+*आज दिया (Paid Now):* ₹${paidRupees.toLocaleString('en-IN')}
+*शेष बाकी (Balance Due):* ₹${balanceDueRupees.toLocaleString('en-IN')}
 
 _Hussain Foods - Sabzi Mandi_`;
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    const url = cleanPhone.length >= 10
+      ? `https://wa.me/91${cleanPhone.slice(-10)}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  const handlePrintPdf = () => {
+    window.print();
   };
 
   if (loading) {
@@ -327,8 +451,9 @@ _Hussain Foods - Sabzi Mandi_`;
 
         <div className="flex items-baseline justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
-              नई खरीद <span className="text-base font-normal opacity-90">/ New purchase</span>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <span>{isEdit ? `खरीद #${id}` : `नई खरीद #${nextEntryNo}`}</span>
+              <span className="text-base font-normal opacity-90">/ {isEdit ? 'Edit Purchase' : 'New Purchase'}</span>
             </h1>
             <p className="text-xs text-white/80 mt-0.5">
               Hussain Foods · {formatDate(date, 'd MMM yyyy')}
@@ -623,12 +748,138 @@ _Hussain Foods - Sabzi Mandi_`;
           </button>
         </div>
 
+        {/* Bad-Condition Goods Deduction Card (PRD 5.4) */}
+        <div className="bg-white border border-rose-200 rounded-xl p-3.5 shadow-2xs space-y-2.5">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <span className="font-bold text-sm text-gray-900">खराब माल कटौती / Damaged Goods (PRD 5.4)</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddBadGoods}
+              className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors"
+            >
+              + कटौती जोड़ें
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            मंडी में जो माल खराब या सड़ा आया है, उसे सप्लायर के हिसाब से काटें।
+          </p>
+
+          {badGoods.map((bg, bIdx) => {
+            const lineTotal = (parseFloat(bg.quantity) || 0) * (parseFloat(bg.rateRupees) || 0);
+            return (
+              <div key={bIdx} className="bg-rose-50/50 border border-rose-200 rounded-lg p-2.5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <select
+                    value={bg.vegetableId}
+                    onChange={(e) => handleBadGoodsChange(bIdx, 'vegetableId', Number(e.target.value))}
+                    className="font-bold text-xs bg-white border border-gray-200 rounded-md p-1.5 text-gray-800"
+                  >
+                    <option value={0}>-- सब्ज़ी चुनें --</option>
+                    {vegetables.map((v) => (
+                      <option key={v.id} value={v.id}>{v.nameHi || v.nameEn}</option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-rose-700">− ₹{lineTotal.toLocaleString('en-IN')}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBadGoods(bIdx)}
+                      className="text-gray-400 hover:text-rose-600 p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="मात्रा (kg)"
+                      value={bg.quantity}
+                      onChange={(e) => handleBadGoodsChange(bIdx, 'quantity', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-md p-1.5 text-xs font-bold"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="भाव (₹/kg)"
+                      value={bg.rateRupees}
+                      onChange={(e) => handleBadGoodsChange(bIdx, 'rateRupees', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-md p-1.5 text-xs font-bold"
+                    />
+                  </div>
+                  <div className="flex-1.5">
+                    <input
+                      type="text"
+                      placeholder="कारण (जैसे: सड़ा हुआ)"
+                      value={bg.reason}
+                      onChange={(e) => handleBadGoodsChange(bIdx, 'reason', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-md p-1.5 text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Supplier Slip / Goods Photo Attachment (PRD 5.2) */}
+        <div className="bg-white border border-[#E3DFD0] rounded-xl p-3.5 shadow-2xs">
+          <div className="flex justify-between items-center mb-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+              <Camera className="w-4 h-4 text-emerald-600" />
+              <span>सप्लायर पर्ची फोटो / Slip Photo (PRD 5.2)</span>
+            </div>
+            {slipPhotoUrl && (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                ✓ फोटो संलग्न (Attached)
+              </span>
+            )}
+          </div>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleSlipPhotoUpload}
+            className="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+          />
+          {slipPhotoUrl && (
+            <div className="mt-2 relative inline-block">
+              <img src={slipPhotoUrl} alt="Slip" className="w-20 h-20 object-cover rounded-lg border border-gray-200 shadow-xs" />
+              <button
+                type="button"
+                onClick={() => setSlipPhotoUrl('')}
+                className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 text-xs shadow-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Real-Time Live Bill & Due Summary Card right at Items */}
         {goodsTotalRupees > 0 && (
           <div className="bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl p-4 shadow-sm space-y-2">
             <div className="flex justify-between items-center text-xs font-bold text-emerald-900">
               <span>इस खरीद का सामान कुल (Goods Total):</span>
               <span className="text-sm font-black text-gray-900">₹{goodsTotalRupees.toLocaleString('en-IN')}</span>
+            </div>
+            {badGoodsTotalRupees > 0 && (
+              <div className="flex justify-between items-center text-xs font-bold text-rose-700">
+                <span>खराब माल कटौती (Bad Goods Deductions):</span>
+                <span className="text-sm font-black text-rose-600">− ₹{badGoodsTotalRupees.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-xs font-bold text-emerald-900 pt-1 border-t border-emerald-200">
+              <span>सप्लायर को देय माल रकम (Net Payable):</span>
+              <span className="text-sm font-black text-emerald-800">₹{netPayableToSellerRupees.toLocaleString('en-IN')}</span>
             </div>
             {selectedSeller && (
               <div className="flex justify-between items-center text-xs font-bold text-emerald-900">
@@ -697,6 +948,18 @@ _Hussain Foods - Sabzi Mandi_`;
             <b className="text-base">₹{goodsTotalRupees.toLocaleString('en-IN')}</b>
           </div>
 
+          {badGoodsTotalRupees > 0 && (
+            <div className="flex justify-between items-center text-sm text-rose-600">
+              <span>खराब माल कटौती / Deductions</span>
+              <b className="text-base">− ₹{badGoodsTotalRupees.toLocaleString('en-IN')}</b>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center text-sm font-bold text-gray-900 pt-1 border-t border-gray-100">
+            <span>देय माल रकम / Net payable</span>
+            <b className="text-base text-emerald-800">₹{netPayableToSellerRupees.toLocaleString('en-IN')}</b>
+          </div>
+
           <div className="flex justify-between items-center text-sm pt-1">
             <span className="font-medium">अभी दिया / Paid now</span>
             <div className="relative">
@@ -757,36 +1020,56 @@ _Hussain Foods - Sabzi Mandi_`;
             <span>{saving ? 'खरीद सेव हो रही है...' : '💾 खरीद सेव करें (Save Purchase)'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleShareWhatsApp}
-            className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-2xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-2xs"
-          >
-            <Share2 className="w-5 h-5 text-emerald-600" />
-            <span>📲 WhatsApp पर खरीद पर्ची भेजें (Share Slip)</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-xs rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+            >
+              <Share2 className="w-4 h-4 text-emerald-600" />
+              <span>📲 WhatsApp शेयर</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintPdf}
+              className="w-full min-h-[46px] bg-white text-gray-800 border-2 border-gray-300 font-bold text-xs rounded-xl hover:bg-gray-100 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+            >
+              <Printer className="w-4 h-4 text-gray-700" />
+              <span>📄 प्रिंट / Save PDF</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Sticky Bottom Save & WhatsApp Bar (Elevated Z-Index) */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 grid grid-cols-2 gap-3 max-w-md mx-auto z-50 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 grid grid-cols-3 gap-2 max-w-md mx-auto z-50 shadow-2xl">
         <button
           type="button"
           onClick={handleShareWhatsApp}
-          className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-xs"
+          className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-xs rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-1 transition-all shadow-xs"
         >
-          <Share2 className="w-4 h-4 text-emerald-600" />
+          <Share2 className="w-3.5 h-3.5 text-emerald-600" />
           <span>WhatsApp</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handlePrintPdf}
+          className="w-full min-h-[46px] bg-white text-gray-700 border border-gray-300 font-bold text-xs rounded-xl hover:bg-gray-50 active:scale-[0.98] flex items-center justify-center gap-1 transition-all shadow-xs"
+        >
+          <Printer className="w-3.5 h-3.5 text-gray-600" />
+          <span>PDF / प्रिंट</span>
         </button>
 
         <button
           type="button"
           disabled={saving}
           onClick={handleSubmit}
-          className="w-full min-h-[46px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
+          className="w-full min-h-[46px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-xs rounded-xl flex items-center justify-center gap-1 shadow-md transition-all disabled:opacity-50"
         >
-          <Check className="w-5 h-5 stroke-[3]" />
-          <span>{saving ? 'सेव हो रहा...' : '💾 खरीद सेव करें'}</span>
+          <Check className="w-4 h-4 stroke-[3]" />
+          <span>{saving ? '...' : '💾 सेव'}</span>
         </button>
       </div>
 

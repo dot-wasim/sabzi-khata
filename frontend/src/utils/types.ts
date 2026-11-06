@@ -34,7 +34,20 @@ export interface Vegetable {
   nameHi: string;
   unit: string;
   category: string | null;
+  defaultCrateKg?: number;
   active: boolean;
+}
+
+export interface BadGoodsDeduction {
+  id?: number;
+  vegetableId: number;
+  vegetableName?: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+  reason?: string;
+  photoUrl?: string;
 }
 
 export interface Seller {
@@ -77,10 +90,15 @@ export interface PurchaseItem {
   unit: string;
   rate: number;
   lineTotal: number;
+  crateWeightKg?: number;
+  convertedKg?: number;
+  itemTransport?: number;
+  itemLabour?: number;
 }
 
 export interface Purchase {
   id: number;
+  entryNo?: number;
   date: string;
   sellerId: number;
   seller?: Seller;
@@ -99,6 +117,9 @@ export interface Purchase {
   paymentMode: string | null;
   accountId?: number | null;
   account?: Account;
+  photoUrl?: string;
+  badGoodsDeductions?: BadGoodsDeduction[];
+  badGoodsTotal?: number;
   notes: string | null;
   createdBy: number;
   items: PurchaseItem[];
@@ -113,10 +134,14 @@ export interface SaleItem {
   unit: string;
   rate: number;
   lineTotal: number;
+  crateWeightKg?: number;
+  convertedKg?: number;
 }
 
 export interface Sale {
   id: number;
+  billNo?: number;
+  isVoid?: boolean;
   date: string;
   buyerId: number;
   buyer?: Buyer;
@@ -126,6 +151,10 @@ export interface Sale {
   paymentMode: string | null;
   accountId?: number | null;
   account?: Account;
+  todayTotal?: number;
+  previousDue?: number;
+  grandTotal?: number;
+  balanceDue?: number;
   notes: string | null;
   createdBy: number;
   items: SaleItem[];

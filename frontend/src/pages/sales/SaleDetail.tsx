@@ -53,38 +53,52 @@ export const SaleDetail: React.FC = () => {
 
   const shareWhatsApp = () => {
     if (!sale) return;
+    const itemsSum = sale.items?.reduce((s: number, it: any) => s + (it.lineTotal || 0), 0) || 0;
+    const netTotal = Math.max(0, itemsSum - (sale.deductionAmount || 0));
+    const previousDue = sale.previousDue || 0;
+    const grandTotal = sale.grandTotal !== undefined ? sale.grandTotal : (netTotal + previousDue);
+    const paidNow = sale.receivedNow || 0;
+    const balanceDue = sale.balanceDue !== undefined ? sale.balanceDue : Math.max(0, grandTotal - paidNow);
+
     const itemsText = sale.items
       ?.map(
         (it: any) =>
-          `• ${it.vegetable?.nameEn || 'Item'} (${it.quantity} ${it.unit} @ ₹${it.rate}/${it.unit}) = ₹${it.lineTotal}`
+          `• ${it.vegetable?.nameHi || it.vegetable?.nameEn || 'सामान'}: ${it.quantity} ${it.unit} @ ₹${(it.rate || 0).toLocaleString('en-IN')}/${it.unit} = ₹${(it.lineTotal || 0).toLocaleString('en-IN')}`
       )
       .join('\n');
 
-    const msg = `*Hussain Foods - Vegetable Bill*
-Bill No: #${sale.id}
-Date: ${formatDate(sale.date, 'dd/MM/yyyy')}
-Customer: ${sale.buyer?.name || 'Walk-in'}
-
-*Items:*
+    const cleanPhone = sale.buyer?.phone ? sale.buyer.phone.replace(/[^0-9]/g, '') : '';
+    const msg = `*हुसैन फूड्स (सब्जी मंडी)*
+बिक्री पर्ची #${sale.billNo || sale.id}
+तारीख: ${formatDate(sale.date, 'dd/MM/yyyy')}
+ग्राहक: ${sale.buyer?.name || 'Walk-in'} ${sale.buyer?.shopName ? `(${sale.buyer.shopName})` : ''}
+----------------------------------
+*सामान विवरण:*
 ${itemsText}
+----------------------------------
+*आज का माल (Today's Total):* ₹${netTotal.toLocaleString('en-IN')}
+*पिछला बाकी (Previous Due):* ₹${previousDue.toLocaleString('en-IN')}
+*कुल हिसाब (Grand Total):* ₹${grandTotal.toLocaleString('en-IN')}
+*जमा (Paid Now):* ₹${paidNow.toLocaleString('en-IN')} (${sale.paymentMode || 'नकद'})
+*बकाया (Balance Due):* ₹${balanceDue.toLocaleString('en-IN')}
 
-*Subtotal:* ₹${itemsSum}
-${sale.deductionAmount > 0 ? `*Deduction:* -₹${sale.deductionAmount}\n` : ''}*Net Bill:* ₹${netTotal}
-*Received:* ₹${sale.receivedNow || 0} (${sale.paymentMode || 'Cash'})
-*Balance Due:* ₹${balance}
+_धन्यवाद! Hussain Foods_`;
 
-_Thank you for your business!_`;
-
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    const url = cleanPhone.length >= 10
+      ? `https://wa.me/91${cleanPhone.slice(-10)}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
   if (loading) return <LoadingSpinner size="lg" />;
   if (!sale) return <div className="p-8 text-center text-gray-500">Sale not found</div>;
 
-  const itemsSum = sale.items?.reduce((s: number, it: any) => s + it.lineTotal, 0) || 0;
-  const netTotal = itemsSum - (sale.deductionAmount || 0);
-  const balance = netTotal - (sale.receivedNow || 0);
+  const itemsSum = sale.items?.reduce((s: number, it: any) => s + (it.lineTotal || 0), 0) || 0;
+  const netTotal = Math.max(0, itemsSum - (sale.deductionAmount || 0));
+  const previousDue = sale.previousDue || 0;
+  const grandTotal = sale.grandTotal !== undefined ? sale.grandTotal : (netTotal + previousDue);
+  const paidNow = sale.receivedNow || 0;
+  const balanceDue = sale.balanceDue !== undefined ? sale.balanceDue : Math.max(0, grandTotal - paidNow);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -133,14 +147,14 @@ _Thank you for your business!_`;
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Sale Bill #{sale.id}</h1>
+            <h1 className="text-xl font-bold text-gray-900">Sale Bill #{sale.billNo || sale.id}</h1>
             <p className="text-xs text-gray-500 mt-0.5">
               Issued on {formatDate(sale.date, 'dd MMMM yyyy')}
             </p>
           </div>
           <div className="text-right">
             <span className="text-xs text-gray-500 block">Buyer / Shop</span>
-            <span className="font-bold text-gray-900 text-sm">{sale.buyer?.name}</span>
+            <span className="font-bold text-gray-900 text-sm">{sale.buyer?.name} {sale.buyer?.shopName ? `(${sale.buyer.shopName})` : ''}</span>
           </div>
         </div>
 
@@ -163,7 +177,7 @@ _Thank you for your business!_`;
                 {sale.items?.map((it: any, idx: number) => (
                   <tr key={idx}>
                     <td className="px-4 py-3 font-semibold text-gray-900">
-                      {it.vegetable?.nameEn} <span className="text-gray-400 font-normal">/ {it.vegetable?.nameHi}</span>
+                      {it.vegetable?.nameHi || it.vegetable?.nameEn} <span className="text-gray-400 font-normal">/ {it.vegetable?.nameEn}</span>
                     </td>
                     <td className="px-4 py-3 text-right text-gray-700 font-medium">
                       {it.quantity} {it.unit}
@@ -181,31 +195,39 @@ _Thank you for your business!_`;
           </div>
         </div>
 
-        {/* Deductions & Totals Breakdown */}
+        {/* PRD 4.2 Formula Breakdown */}
         <div className="bg-gray-50/70 p-4 rounded-xl space-y-2 text-sm border border-gray-100">
           <div className="flex justify-between text-gray-600">
-            <span>Items Subtotal:</span>
+            <span>सामान कुल / Items Subtotal:</span>
             <CurrencyDisplay amount={itemsSum} className="font-medium" />
           </div>
           {sale.deductionAmount > 0 && (
             <div className="flex justify-between text-rose-600">
-              <span>Deductions ({sale.deductionReason || 'Returns'}):</span>
+              <span>छूट / Deduction ({sale.deductionReason || 'कटौती'}):</span>
               <span>-<CurrencyDisplay amount={sale.deductionAmount} /></span>
             </div>
           )}
-          <div className="flex justify-between text-base font-bold text-gray-900 border-t border-gray-200 pt-2">
-            <span>Net Sale Total:</span>
+          <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-200 pt-2">
+            <span>आज का माल / Today's Total:</span>
             <CurrencyDisplay amount={netTotal} />
           </div>
-          {sale.receivedNow > 0 && (
+          <div className="flex justify-between text-sm text-amber-700 font-semibold">
+            <span>पिछला बाकी / Previous Due:</span>
+            <CurrencyDisplay amount={previousDue} />
+          </div>
+          <div className="flex justify-between text-base font-black text-gray-950 border-t border-gray-200 pt-2">
+            <span>कुल हिसाब / Grand Total:</span>
+            <CurrencyDisplay amount={grandTotal} />
+          </div>
+          {paidNow > 0 && (
             <div className="flex justify-between text-emerald-700 font-semibold">
-              <span>Received Now ({sale.paymentMode || 'Cash'}):</span>
-              <CurrencyDisplay amount={sale.receivedNow} />
+              <span>जमा / Paid Now ({sale.paymentMode || 'नकद'}):</span>
+              <CurrencyDisplay amount={paidNow} />
             </div>
           )}
-          <div className="flex justify-between text-amber-700 font-bold border-t border-gray-200 pt-2">
-            <span>Market Balance Due:</span>
-            <CurrencyDisplay amount={balance} />
+          <div className="flex justify-between text-rose-600 font-black text-lg border-t-2 border-gray-300 pt-2">
+            <span>बकाया / Balance Due:</span>
+            <CurrencyDisplay amount={balanceDue} />
           </div>
         </div>
 

@@ -446,7 +446,7 @@ export const PurchaseList: React.FC = () => {
                 >
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-gray-900 text-sm">खरीद #{p.id}</span>
+                      <span className="font-bold text-gray-900 text-sm">खरीद #{p.entryNo || p.id}</span>
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{formatDate(p.date)}</span>

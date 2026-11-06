@@ -196,19 +196,22 @@ export const Dashboard: React.FC = () => {
     return sum + Math.round((w.quantity || 0) * unitCost);
   }, 0);
 
-  // Net Money Made (Net Profit)
-  const netProfit = totalNetSales - totalPurchaseGoods - totalTransportCost - mandiLabourTotal - otherExpensesTotal - totalWastageLoss;
+  // Bad-condition Goods Deductions (PRD 5.4 & 6)
+  const totalBadGoodsDeductions = periodPurchases.reduce((sum, p) => sum + (p.badGoodsTotal || 0), 0);
+  const netPurchasesCost = Math.max(0, totalPurchaseGoods - totalBadGoodsDeductions);
+
+  // Net Money Made (Net Profit: Sales - (Purchases + Transport + Labour - Bad Goods Deductions) - Expenses - Wastage)
+  const netProfit = totalNetSales - netPurchasesCost - totalTransportCost - mandiLabourTotal - otherExpensesTotal - totalWastageLoss;
   const netMarginPct = totalNetSales > 0 ? ((netProfit / totalNetSales) * 100).toFixed(1) : '0';
 
-  // Receivables & Payables
-  const totalReceivable = buyers.reduce(
-    (sum, b) => sum + ((b.currentBalance !== undefined ? b.currentBalance : b.openingBalance) || 0),
-    0
-  );
-  const totalPayable = sellers.reduce(
-    (sum, s) => sum + ((s.currentBalance !== undefined ? s.currentBalance : s.openingBalance) || 0),
-    0
-  );
+  // Receivables & Payables (Universal Resolver)
+  const getBuyerDue = (b: any) =>
+    (b.currentBalance !== undefined ? b.currentBalance : b.currentDue) || b.openingBalance || 0;
+  const getSellerDue = (s: any) =>
+    (s.currentBalance !== undefined ? s.currentBalance : s.currentDue) || s.openingBalance || 0;
+
+  const totalReceivable = buyers.reduce((sum, b) => sum + getBuyerDue(b), 0);
+  const totalPayable = sellers.reduce((sum, s) => sum + getSellerDue(s), 0);
 
   // Accounts Balances
   const accountsList = dashData?.accounts || [];
@@ -226,7 +229,7 @@ export const Dashboard: React.FC = () => {
         vehicle: p.transporterName || 'गाड़ी / टेम्पो',
         rateDetail: p.transportType === 'PER_UNIT' ? `₹${(p.transportRate || 0) / 100} / ${p.transportUnit || 'kg'}` : 'Flat भाड़ा',
         amount: p.transport,
-        ref: `खरीद #${p.id} (${p.seller?.name || 'किसान'})`,
+        ref: `खरीद #${p.entryNo || p.id} (${p.seller?.name || 'किसान'})`,
       });
     }
   }
@@ -1026,7 +1029,7 @@ export const Dashboard: React.FC = () => {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-gray-900 text-sm">खरीद #{p.id}</span>
+                        <span className="font-extrabold text-gray-900 text-sm">खरीद #{p.entryNo || p.id}</span>
                         <span className="text-xs text-gray-500 font-bold">{formatDate(p.date)}</span>
                         <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
                           {p.seller?.name || 'किसान'}
@@ -1116,7 +1119,7 @@ export const Dashboard: React.FC = () => {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-gray-900 text-sm">बिक्री #{s.id}</span>
+                        <span className="font-extrabold text-gray-900 text-sm">बिक्री बिल #{s.billNo || s.id}</span>
                         <span className="text-xs text-gray-500 font-bold">{formatDate(s.date)}</span>
                         <span className="text-xs font-black text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md">
                           {s.buyer?.name || 'ग्राहक'}

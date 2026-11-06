@@ -103,7 +103,7 @@ export const PurchaseDetail: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Purchase #{purchase.id}</h1>
+            <h1 className="text-xl font-bold text-gray-900">Purchase #{purchase.entryNo || purchase.id}</h1>
             <p className="text-xs text-gray-500 mt-0.5">
               Recorded on {formatDate(purchase.date, 'dd MMMM yyyy')}
             </p>
@@ -154,8 +154,18 @@ export const PurchaseDetail: React.FC = () => {
         {/* Extras & Totals Breakdown */}
         <div className="bg-gray-50/70 p-4 rounded-xl space-y-2 text-sm border border-gray-100">
           <div className="flex justify-between text-gray-600">
-            <span>Items Subtotal:</span>
+            <span>सब्जियां कुल (Items Subtotal):</span>
             <CurrencyDisplay amount={itemsSum} className="font-medium" />
+          </div>
+          {purchase.badGoodsTotal > 0 && (
+            <div className="flex justify-between text-rose-600 font-medium">
+              <span>खराब माल कटौती (Bad Goods Deductions):</span>
+              <span>-<CurrencyDisplay amount={purchase.badGoodsTotal} /></span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-200 pt-2">
+            <span>देय माल रकम (Net Goods Payable):</span>
+            <CurrencyDisplay amount={Math.max(0, itemsSum - (purchase.badGoodsTotal || 0))} />
           </div>
           {purchase.transport > 0 && (
             <div className="flex justify-between text-gray-600">
@@ -176,7 +186,7 @@ export const PurchaseDetail: React.FC = () => {
             </div>
           )}
           <div className="flex justify-between text-base font-bold text-gray-900 border-t border-gray-200 pt-2">
-            <span>Total Purchase Amount:</span>
+            <span>कुल खरीद लागत (Landed Cost):</span>
             <CurrencyDisplay amount={grandTotal} />
           </div>
           {purchase.paidNow > 0 && (
@@ -190,6 +200,13 @@ export const PurchaseDetail: React.FC = () => {
             <CurrencyDisplay amount={balance} />
           </div>
         </div>
+
+        {purchase.photoUrl && (
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <h4 className="text-xs font-bold text-gray-600 uppercase mb-2">सप्लायर रसीद फोटो (Slip Photo)</h4>
+            <img src={purchase.photoUrl} alt="Slip" className="max-h-64 rounded-lg border border-gray-200" />
+          </div>
+        )}
 
         {purchase.notes && (
           <div className="text-xs text-gray-600 bg-amber-50/50 p-3 rounded-xl border border-amber-100">

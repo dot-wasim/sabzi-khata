@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useBossAuth } from '../context/BossAuthContext';
+import { offlineDb } from '../storage/offlineDb';
 import {
   TrendingUp,
   ShoppingCart,
@@ -23,6 +24,27 @@ export const Layout: React.FC = () => {
   const { lockBoss } = useBossAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [backupStatus, setBackupStatus] = useState<{ isOverdue: boolean; daysAgo: number } | null>(null);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    offlineDb.getBackupStatus().then(setBackupStatus);
+    const interval = setInterval(() => {
+      offlineDb.getBackupStatus().then(setBackupStatus);
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Determine current active system
   let activeSystem: 'sell' | 'buy' | 'boss' = 'sell';
@@ -122,6 +144,13 @@ export const Layout: React.FC = () => {
               <p className="text-xs font-semibold text-gray-500">Hussain Foods</p>
             </div>
           </div>
+          {backupStatus?.isOverdue ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" title="बैकअप बाकी (Overdue)" />
+          ) : isOnline ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="क्लाउड सुरक्षित (Synced)" />
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full bg-gray-400" title="ऑफ़लाइन (Offline)" />
+          )}
         </div>
 
         {/* System Identity Banner */}
@@ -311,6 +340,24 @@ export const Layout: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* PRD 8 Backup Indicator */}
+          {backupStatus?.isOverdue ? (
+            <span className="flex items-center gap-1 text-[10.5px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300" title="3+ दिन से बैकअप नहीं हुआ">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="hidden sm:inline">बैकअप बाकी</span>
+            </span>
+          ) : isOnline ? (
+            <span className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300" title="क्लाउड सुरक्षित">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="hidden sm:inline">सुरक्षित</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10.5px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full" title="ऑफ़लाइन मोड">
+              <span className="w-2 h-2 rounded-full bg-gray-400" />
+              <span className="hidden sm:inline">ऑफ़लाइन</span>
+            </span>
+          )}
+
           <button
             onClick={() => navigate('/login')}
             className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors"

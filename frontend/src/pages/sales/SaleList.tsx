@@ -148,15 +148,15 @@ export const SaleList: React.FC = () => {
 
     const message =
       `*हुसैन फूड्स (सब्जी मंडी)*\n` +
-      `बिक्री रसीद #${sale.id}\n` +
+      `बिक्री पर्ची #${sale.billNo || sale.id}\n` +
       `तारीख: ${formatDate(sale.date)}\n` +
       `ग्राहक: ${buyerName}\n` +
       `--------------------------\n` +
       `${itemsList}\n` +
       `--------------------------\n` +
-      `कुल बिल: ₹${Math.round(netTotal / 100).toLocaleString('en-IN')}\n` +
-      `जमा (Received): ₹${Math.round((sale.receivedNow || 0) / 100).toLocaleString('en-IN')}\n` +
-      `बाकी (Due): ₹${Math.round(balance / 100).toLocaleString('en-IN')}\n\n` +
+      `आज का माल: ₹${Math.round(netTotal / 100).toLocaleString('en-IN')}\n` +
+      `जमा (Paid Now): ₹${Math.round((sale.receivedNow || 0) / 100).toLocaleString('en-IN')}\n` +
+      `बकाया (Balance Due): ₹${Math.round(balance / 100).toLocaleString('en-IN')}\n\n` +
       `धन्यवाद!`;
 
     const phone = sale.buyer?.phone ? sale.buyer.phone.replace(/[^0-9]/g, '') : '';
@@ -447,7 +447,12 @@ export const SaleList: React.FC = () => {
                 >
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-gray-900 text-sm">बिल #{s.id}</span>
+                      <span className="font-bold text-gray-900 text-sm">बिल #{s.billNo || s.id}</span>
+                      {s.isVoid && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">
+                          रद्द (Void)
+                        </span>
+                      )}
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{formatDate(s.date)}</span>

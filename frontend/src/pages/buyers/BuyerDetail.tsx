@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBuyer, getBuyerLedger, updateBuyer } from '../../api/buyers';
+import { createPayment } from '../../api/payments';
 import { BuyerModal } from './BuyerModal';
+import { PaymentModal } from '../payments/PaymentModal';
 import { formatDate } from '../../utils/date';
 import { paiseToRupees } from '../../utils/currency';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -11,7 +13,8 @@ import {
   MessageCircle,
   Edit2,
   Plus,
-  Receipt
+  Receipt,
+  CreditCard
 } from 'lucide-react';
 
 export const BuyerDetail: React.FC = () => {
@@ -21,6 +24,7 @@ export const BuyerDetail: React.FC = () => {
   const [ledger, setLedger] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const buyerId = parseInt(id || '0');
 
@@ -227,10 +231,11 @@ Hussain Foods की तरफ से आपके खाते का पिछ
       {/* Floating Bottom Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-[#E3DFD0] flex gap-2.5 max-w-md mx-auto z-40">
         <button
-          onClick={() => navigate('/payments')}
-          className="flex-1 min-h-[48px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-bold text-sm rounded-xl hover:bg-emerald-50 flex items-center justify-center transition-colors"
+          onClick={() => setPaymentModalOpen(true)}
+          className="flex-1 min-h-[48px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-bold text-sm rounded-xl hover:bg-emerald-50 flex items-center justify-center gap-1.5 transition-colors"
         >
-          भुगतान लें (Record Pay)
+          <CreditCard className="w-4 h-4 text-emerald-600" />
+          <span>+ जमा लें (Receive Pay)</span>
         </button>
         <button
           onClick={() => navigate('/sales/new')}
@@ -247,6 +252,19 @@ Hussain Foods की तरफ से आपके खाते का पिछ
         buyer={buyer}
         onClose={() => setEditModalOpen(false)}
         onSave={handleUpdate}
+      />
+
+      {/* Direct Payment Modal (PRD 4.3) */}
+      <PaymentModal
+        isOpen={paymentModalOpen}
+        defaultDirection="RECEIVED_FROM_BUYER"
+        initialBuyerId={buyerId}
+        onClose={() => setPaymentModalOpen(false)}
+        onSave={async (paymentData) => {
+          await createPayment(paymentData);
+          setPaymentModalOpen(false);
+          fetchData();
+        }}
       />
     </div>
   );

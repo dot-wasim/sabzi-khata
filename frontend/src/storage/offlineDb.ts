@@ -14,10 +14,28 @@ const STORAGE_KEYS = {
   SETTINGS: 'sk_offline_settings',
   USER: 'sk_offline_user',
   TOKEN: 'token',
+  CRATE_WEIGHTS: 'sk_offline_crate_weights',
+  BACKUP_STATUS: 'sk_offline_backup_status',
 };
 
 // Seed initial data on fresh install
 function initDefaultData() {
+  if (!localStorage.getItem(STORAGE_KEYS.CRATE_WEIGHTS)) {
+    const defaultCrateWeights: Record<number, number> = {
+      1: 50, // Potato sack/crate
+      2: 50, // Onion sack/crate
+      3: 25, // Tomato crate (25 kg)
+      4: 20, // Cauliflower crate
+    };
+    localStorage.setItem(STORAGE_KEYS.CRATE_WEIGHTS, JSON.stringify(defaultCrateWeights));
+  }
+
+  if (!localStorage.getItem(STORAGE_KEYS.BACKUP_STATUS)) {
+    localStorage.setItem(STORAGE_KEYS.BACKUP_STATUS, JSON.stringify({
+      lastBackupTime: new Date().toISOString(),
+      status: 'synced',
+    }));
+  }
   if (!localStorage.getItem(STORAGE_KEYS.VEGETABLES)) {
     const defaultVegetables = [
       { id: 1, nameEn: 'Potato', nameHi: 'आलू', unit: 'kg', category: 'Root', active: true },
@@ -243,7 +261,7 @@ export const offlineDb = {
     }
 
     // Process each sale as debit and received amount as credit
-    const salesEntries = sales.map((s) => {
+    const salesEntries = sales.filter((s) => !s.isVoid).map((s) => {
       const saleNet = Math.max(
         0,
         (s.items || []).reduce((sum: number, it: any) => sum + (it.lineTotal || 0), 0) - (s.deductionAmount || 0)
@@ -252,10 +270,11 @@ export const offlineDb = {
         date: s.date,
         rawDate: new Date(s.date).getTime(),
         type: 'SALE',
+        billNo: s.billNo || s.id,
+        referenceId: s.billNo ? `Bill ${s.billNo}` : `Bill #${s.id}`,
         notes: (s.items || []).map((it: any) => `${it.quantity} ${it.unit}`).join(', '),
         debit: saleNet,
         credit: 0,
-        referenceId: s.id,
         receivedNow: s.receivedNow || 0,
         paymentMode: s.paymentMode || 'नकद',
       };
@@ -263,18 +282,18 @@ export const offlineDb = {
 
     // Also include payments from this buyer
     const payments = getCollection<any>(STORAGE_KEYS.PAYMENTS).filter(
-      (p) => p.buyerId === id && p.direction === 'IN'
+      (p) => p.buyerId === id && (p.direction === 'IN' || p.direction === 'RECEIVED_FROM_BUYER')
     );
     const paymentEntries = payments.map((p) => ({
       date: p.date,
       rawDate: new Date(p.date).getTime(),
       type: 'PAYMENT',
-      notes: `खाता जमा (${p.paymentMode || 'नकद'}) ${p.notes ? '- ' + p.notes : ''}`,
+      referenceId: `Payment, ${p.mode || p.paymentMode || 'UPI'}`,
+      notes: `खाता जमा (${p.mode || p.paymentMode || 'नकद'}) ${p.notes ? '- ' + p.notes : ''}`,
       debit: 0,
       credit: p.amount || 0,
-      referenceId: p.id,
       receivedNow: 0,
-      paymentMode: p.paymentMode || 'नकद',
+      paymentMode: p.mode || p.paymentMode || 'नकद',
     }));
 
     // Merge chronologically
@@ -284,20 +303,22 @@ export const offlineDb = {
         date: s.date,
         rawDate: s.rawDate,
         type: 'SALE',
+        billNo: s.billNo,
+        referenceId: s.referenceId,
         notes: s.notes,
         debit: s.debit,
         credit: 0,
-        referenceId: s.referenceId,
       });
       if (s.receivedNow > 0) {
         allChronological.push({
           date: s.date,
           rawDate: s.rawDate + 1, // slightly after sale
           type: 'PAYMENT',
+          billNo: s.billNo,
+          referenceId: `जमा (${s.paymentMode})`,
           notes: `जमा (${s.paymentMode})`,
           debit: 0,
           credit: s.receivedNow,
-          referenceId: s.referenceId,
         });
       }
     });
@@ -310,11 +331,13 @@ export const offlineDb = {
       entries.push({
         date: entry.date,
         type: entry.type,
+        referenceId: entry.referenceId,
+        billNo: entry.billNo,
         notes: entry.notes,
         debit: entry.debit,
         credit: entry.credit,
         balance: runningBalance,
-        referenceId: entry.referenceId,
+        runningBalance: runningBalance,
       });
     });
 
@@ -776,30 +799,62 @@ export const offlineDb = {
 
     const buyer = buyers.find((b) => b.id === Number(data.buyerId));
 
-    // Calculate line totals
-    const items = (data.items || []).map((it: any, idx: number) => ({
-      id: Date.now() + idx,
-      vegetableId: it.vegetableId,
-      quantity: it.quantity,
-      unit: it.unit || 'kg',
-      rate: it.rate,
-      lineTotal: Math.round(it.quantity * it.rate),
-    }));
+    // Sequential Bill Number (1, 2, 3...)
+    const maxBillNo = sales.reduce((max: number, s: any) => Math.max(max, s.billNo || 0), 0);
+    const billNo = maxBillNo > 0 ? maxBillNo + 1 : (sales.length + 1);
+
+    // Calculate line totals and crate conversions
+    const items = (data.items || []).map((it: any, idx: number) => {
+      const qty = parseFloat(it.quantity) || 0;
+      const rate = it.rate;
+      const unit = it.unit || 'kg';
+      const crateWeightKg = it.crateWeightKg || (unit === 'crate' ? 25 : undefined);
+      const convertedKg = unit === 'crate' ? qty * (crateWeightKg || 25) : qty;
+      return {
+        id: Date.now() + idx,
+        vegetableId: it.vegetableId,
+        quantity: qty,
+        unit,
+        rate,
+        lineTotal: Math.round(qty * rate),
+        crateWeightKg,
+        convertedKg,
+      };
+    });
 
     const subtotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
     const deductionAmount = data.deductionAmount || 0;
-    const netTotal = Math.max(0, subtotal - deductionAmount);
+    const todayTotal = Math.max(0, subtotal - deductionAmount);
     const receivedNow = data.receivedNow || 0;
-    const balanceDue = Math.max(0, netTotal - receivedNow);
+
+    // Previous Due from customer running balance before this bill
+    const bSales = sales.filter((s) => s.buyerId === Number(data.buyerId) && !s.isVoid);
+    const bTotalSold = bSales.reduce((sum, s) => {
+      const linesTot = (s.items || []).reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+      return sum + Math.max(0, linesTot - (s.deductionAmount || 0));
+    }, 0);
+    const bTotalPaid = bSales.reduce((sum, s) => sum + (s.receivedNow || 0), 0) +
+      getCollection<any>(STORAGE_KEYS.PAYMENTS).filter((p) => p.buyerId === Number(data.buyerId) && (p.direction === 'IN' || p.direction === 'RECEIVED_FROM_BUYER'))
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    const previousDue = (buyer?.openingBalance || 0) + bTotalSold - bTotalPaid;
+    const grandTotal = todayTotal + Math.max(0, previousDue);
+    const balanceDue = Math.max(0, grandTotal - receivedNow);
 
     const newSale = {
       id: Date.now(),
+      billNo,
+      isVoid: false,
       date: data.date || new Date().toISOString(),
       buyerId: Number(data.buyerId),
-      buyer: buyer ? { id: buyer.id, name: buyer.name, phone: buyer.phone } : undefined,
+      buyer: buyer ? { id: buyer.id, name: buyer.name, phone: buyer.phone, shopName: buyer.shopName } : undefined,
       deductionAmount,
       deductionReason: data.deductionReason,
+      todayTotal,
+      previousDue: Math.max(0, previousDue),
+      grandTotal,
       receivedNow,
+      balanceDue,
       paymentMode: data.paymentMode || 'Cash',
       accountId: data.accountId,
       notes: data.notes,
@@ -810,11 +865,10 @@ export const offlineDb = {
     sales.push(newSale);
     saveCollection(STORAGE_KEYS.SALES, sales);
 
-    // Update buyer due
+    // Update buyer live balance
     if (buyer) {
-      const prevDue = (buyer.currentDue !== undefined ? buyer.currentDue : buyer.openingBalance || 0);
-      buyer.currentDue = prevDue + balanceDue;
-      buyer.currentBalance = buyer.currentDue;
+      buyer.currentDue = balanceDue;
+      buyer.currentBalance = balanceDue;
       saveCollection(STORAGE_KEYS.BUYERS, buyers);
     }
 
@@ -828,6 +882,59 @@ export const offlineDb = {
     }
 
     return newSale;
+  },
+
+  updateSale: async (id: number, data: any) => {
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const idx = sales.findIndex((s) => s.id === id);
+    if (idx !== -1) {
+      const existing = sales[idx];
+      const items = (data.items || existing.items || []).map((it: any, i: number) => ({
+        id: it.id || (Date.now() + i),
+        vegetableId: it.vegetableId,
+        quantity: parseFloat(it.quantity) || 0,
+        unit: it.unit || 'kg',
+        rate: it.rate,
+        lineTotal: Math.round((parseFloat(it.quantity) || 0) * it.rate),
+        crateWeightKg: it.crateWeightKg || (it.unit === 'crate' ? 25 : undefined),
+        convertedKg: it.unit === 'crate' ? (parseFloat(it.quantity) || 0) * (it.crateWeightKg || 25) : (parseFloat(it.quantity) || 0),
+      }));
+      const subtotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
+      const deductionAmount = data.deductionAmount !== undefined ? data.deductionAmount : (existing.deductionAmount || 0);
+      const todayTotal = Math.max(0, subtotal - deductionAmount);
+      const receivedNow = data.receivedNow !== undefined ? data.receivedNow : (existing.receivedNow || 0);
+
+      sales[idx] = {
+        ...existing,
+        ...data,
+        items,
+        deductionAmount,
+        todayTotal,
+        receivedNow,
+        updatedAt: new Date().toISOString(),
+      };
+      saveCollection(STORAGE_KEYS.SALES, sales);
+
+      // Recalculate buyer live balance
+      if (sales[idx].buyerId) {
+        await offlineDb.getBuyer(sales[idx].buyerId);
+      }
+      return sales[idx];
+    }
+    return null;
+  },
+
+  voidSale: async (id: number) => {
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const sale = sales.find((s) => s.id === id);
+    if (sale) {
+      sale.isVoid = true;
+      saveCollection(STORAGE_KEYS.SALES, sales);
+      if (sale.buyerId) {
+        await offlineDb.getBuyer(sale.buyerId);
+      }
+    }
+    return sale;
   },
 
   // Purchases (Buy Desk)
@@ -848,32 +955,72 @@ export const offlineDb = {
 
     const seller = sellers.find((s) => s.id === Number(data.sellerId));
 
-    const items = (data.items || []).map((it: any, idx: number) => ({
-      id: Date.now() + idx,
-      vegetableId: it.vegetableId,
-      quantity: it.quantity,
-      unit: it.unit || 'kg',
-      rate: it.rate,
-      lineTotal: Math.round(it.quantity * it.rate),
-    }));
+    // Sequential Entry Number
+    const maxEntryNo = purchases.reduce((max: number, p: any) => Math.max(max, p.entryNo || 0), 0);
+    const entryNo = maxEntryNo > 0 ? maxEntryNo + 1 : (purchases.length + 1);
+
+    // Items with crate weight conversion & line transport
+    const items = (data.items || []).map((it: any, idx: number) => {
+      const qty = parseFloat(it.quantity) || 0;
+      const rate = it.rate;
+      const unit = it.unit || 'kg';
+      const crateWeightKg = it.crateWeightKg || (unit === 'crate' ? 25 : undefined);
+      const convertedKg = unit === 'crate' ? qty * (crateWeightKg || 25) : qty;
+      return {
+        id: Date.now() + idx,
+        vegetableId: it.vegetableId,
+        quantity: qty,
+        unit,
+        rate,
+        lineTotal: Math.round(qty * rate),
+        crateWeightKg,
+        convertedKg,
+        itemTransport: it.itemTransport || 0,
+        itemLabour: it.itemLabour || 0,
+      };
+    });
 
     const goodsTotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
+    const totalOrderKg = items.reduce((sum: number, it: any) => sum + (it.convertedKg || 0), 0);
+
     const transport = data.transport || 0;
     const labour = data.labour || 0;
-    const paidAmount = data.paidAmount || 0;
-    const balanceDue = Math.max(0, goodsTotal - paidAmount);
+
+    // Bad-Condition Goods Deductions (PRD 5.4)
+    const badGoodsDeductions = (data.badGoodsDeductions || []).map((d: any, idx: number) => ({
+      id: Date.now() + 100 + idx,
+      vegetableId: d.vegetableId,
+      vegetableName: d.vegetableName,
+      quantity: parseFloat(d.quantity) || 0,
+      unit: d.unit || 'kg',
+      rate: d.rate || 0,
+      amount: Math.round((parseFloat(d.quantity) || 0) * (d.rate || 0)),
+      reason: d.reason || 'खराब माल / Damaged',
+      photoUrl: d.photoUrl,
+    }));
+    const badGoodsTotal = badGoodsDeductions.reduce((sum: number, d: any) => sum + d.amount, 0);
+
+    // Net payable to supplier for goods after bad goods deduction
+    const netGoodsPayable = Math.max(0, goodsTotal - badGoodsTotal);
+    const paidAmount = data.paidAmount || data.paidNow || 0;
+    const balanceDue = Math.max(0, netGoodsPayable - paidAmount);
 
     const newPurchase = {
       id: Date.now(),
+      entryNo,
       date: data.date || new Date().toISOString(),
       sellerId: Number(data.sellerId),
       seller: seller ? { id: seller.id, name: seller.name, phone: seller.phone, village: seller.village } : undefined,
       transport,
       labour,
+      totalOrderKg,
       paidNow: paidAmount,
       paymentMode: data.paymentMode || 'Cash',
       accountId: data.accountId,
       notes: data.notes,
+      photoUrl: data.photoUrl,
+      badGoodsDeductions,
+      badGoodsTotal,
       items,
       createdAt: new Date().toISOString(),
     };
@@ -998,5 +1145,50 @@ export const offlineDb = {
   setPin: async (newPin: string) => {
     localStorage.setItem('sk_boss_pin', newPin);
     return { message: 'PIN updated successfully', pinSet: true };
+  },
+
+  // Daily Crate Weights (PRD 3 & 4.2)
+  getCrateWeights: async () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CRATE_WEIGHTS);
+      return data ? JSON.parse(data) : { 1: 50, 2: 50, 3: 25, 4: 20 };
+    } catch (e) {
+      return { 1: 50, 2: 50, 3: 25, 4: 20 };
+    }
+  },
+
+  setCrateWeight: async (vegetableId: number, kgPerCrate: number) => {
+    try {
+      const current = await offlineDb.getCrateWeights();
+      current[vegetableId] = kgPerCrate;
+      localStorage.setItem(STORAGE_KEYS.CRATE_WEIGHTS, JSON.stringify(current));
+      return current;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Backup Status (PRD 8)
+  getBackupStatus: async () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.BACKUP_STATUS);
+      const parsed = data ? JSON.parse(data) : { lastBackupTime: new Date().toISOString() };
+      const diffMs = Date.now() - new Date(parsed.lastBackupTime).getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return {
+        lastBackupTime: parsed.lastBackupTime,
+        isOverdue: diffDays >= 3,
+        daysAgo: diffDays,
+      };
+    } catch (e) {
+      return { lastBackupTime: new Date().toISOString(), isOverdue: false, daysAgo: 0 };
+    }
+  },
+
+  setBackupStatus: async () => {
+    localStorage.setItem(STORAGE_KEYS.BACKUP_STATUS, JSON.stringify({
+      lastBackupTime: new Date().toISOString(),
+      status: 'synced',
+    }));
   },
 };

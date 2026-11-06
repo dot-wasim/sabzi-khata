@@ -37,3 +37,12 @@ export async function updateSale(id: number, data: any): Promise<Sale> {
 export async function deleteSale(id: number): Promise<void> {
   await apiClient.delete(`/sales/${id}`);
 }
+
+export async function voidSale(id: number): Promise<Sale | null> {
+  try {
+    const res = await apiClient.post(`/sales/${id}/void`);
+    return res.data;
+  } catch (err) {
+    return (await offlineDb.voidSale(id)) as any;
+  }
+}

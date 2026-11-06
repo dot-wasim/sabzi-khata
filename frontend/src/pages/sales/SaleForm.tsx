@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { getBuyers, createBuyer } from '../../api/buyers';
 import { getVegetables } from '../../api/vegetables';
 import { getAccounts } from '../../api/accounts';
-import { createSale, getSale, updateSale } from '../../api/sales';
+import { createSale, getSale, updateSale, getSales } from '../../api/sales';
 import { Buyer, Vegetable, Account } from '../../utils/types';
 import { CurrencyDisplay } from '../../components/CurrencyDisplay';
 import { BuyerModal } from '../buyers/BuyerModal';
@@ -17,7 +17,8 @@ import {
   Share2,
   Check,
   Receipt,
-  UserPlus
+  UserPlus,
+  Printer
 } from 'lucide-react';
 
 interface FormLineItem {
@@ -57,19 +58,25 @@ export const SaleForm: React.FC = () => {
   const [receivedNowRupees, setReceivedNowRupees] = useState('');
   const [accountId, setAccountId] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
+  const [nextBillNo, setNextBillNo] = useState<number>(1);
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
       try {
-        const [buyersData, vegData, accData] = await Promise.all([
+        const [buyersData, vegData, accData, salesData] = await Promise.all([
           getBuyers(),
           getVegetables(),
           getAccounts(),
+          getSales({ limit: 500 }).catch(() => ({ sales: [] })),
         ]);
         setBuyers(buyersData);
         setVegetables(vegData);
         setAccounts(accData);
+
+        const salesList = (salesData as any)?.sales || [];
+        const maxBill = salesList.reduce((m: number, s: any) => Math.max(m, s.billNo || 0), 0);
+        setNextBillNo(maxBill > 0 ? maxBill + 1 : salesList.length + 1);
 
         const defaultAcc = accData.find((a) => a.isDefault) || accData[0];
         if (defaultAcc && !isEdit) {
@@ -217,12 +224,20 @@ export const SaleForm: React.FC = () => {
         buyerId: Number(buyerId),
         accountId: accountId ? Number(accountId) : undefined,
         paymentMode: selectedAcc ? selectedAcc.name : 'Cash',
-        items: validItems.map((it) => ({
-          vegetableId: Number(it.vegetableId),
-          quantity: parseFloat(it.quantity),
-          unit: it.unit,
-          rate: rupeesToPaise(it.rateRupees),
-        })),
+        previousDue: previousBalanceRupees,
+        items: validItems.map((it) => {
+          const qty = parseFloat(it.quantity) || 0;
+          const isCrate = it.unit === 'crate';
+          const crateKg = isCrate ? (parseFloat(it.kgPerCrate || '25') || 25) : undefined;
+          return {
+            vegetableId: Number(it.vegetableId),
+            quantity: qty,
+            unit: it.unit,
+            rate: rupeesToPaise(it.rateRupees),
+            crateWeightKg: crateKg,
+            convertedKg: isCrate && crateKg ? qty * crateKg : qty,
+          };
+        }),
         deductionAmount: deductionRupees > 0 ? rupeesToPaise(deductionRupees) : undefined,
         deductionReason: deductionReason.trim() || undefined,
         receivedNow: receivedRupees > 0 ? rupeesToPaise(receivedRupees) : undefined,
@@ -249,26 +264,38 @@ export const SaleForm: React.FC = () => {
       .map((it) => {
         const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
         const lineTotal = (parseFloat(it.quantity) || 0) * (parseFloat(it.rateRupees) || 0);
-        return `• ${veg?.nameEn || 'Item'} (${it.quantity} ${it.unit} @ ₹${it.rateRupees}/${it.unit}) = ₹${lineTotal}`;
+        return `• ${veg?.nameHi || veg?.nameEn || 'सामान'}: ${it.quantity} ${it.unit} @ ₹${it.rateRupees}/${it.unit} = ₹${lineTotal.toLocaleString('en-IN')}`;
       })
       .join('\n');
 
-    const msg = `*Hussain Foods — Vegetable Bill*
-Date: ${formatDate(date, 'dd/MM/yyyy')}
-Customer: ${buyerName}
+    const grandTotal = netTotalRupees + previousBalanceRupees;
+    const balanceDue = Math.max(0, grandTotal - receivedRupees);
+    const cleanPhone = selectedBuyer?.phone ? selectedBuyer.phone.replace(/[^0-9]/g, '') : '';
 
-*Items:*
+    const msg = `*हुसैन फूड्स (सब्जी मंडी)*
+बिक्री पर्ची #${isEdit ? id : ''}
+तारीख: ${formatDate(date, 'dd/MM/yyyy')}
+ग्राहक: ${buyerName} ${selectedBuyer?.shopName ? `(${selectedBuyer.shopName})` : ''}
+----------------------------------
+*सामान विवरण:*
 ${itemsText}
+----------------------------------
+*आज का माल (Today's Total):* ₹${netTotalRupees.toLocaleString('en-IN')}
+*पिछला बाकी (Previous Due):* ₹${previousBalanceRupees.toLocaleString('en-IN')}
+*कुल हिसाब (Grand Total):* ₹${grandTotal.toLocaleString('en-IN')}
+*जमा (Paid Now):* ₹${receivedRupees.toLocaleString('en-IN')}
+*बकाया (Balance Due):* ₹${balanceDue.toLocaleString('en-IN')}
 
-*Subtotal:* ₹${subtotalRupees}
-${deductionRupees > 0 ? `*Deduction:* -₹${deductionRupees} (${deductionReason})\n` : ''}*Net Total:* ₹${netTotalRupees}
-*Received:* ₹${receivedRupees}
-*This Bill Due:* ₹${thisBillDueRupees}
-*Total Khata Due:* ₹${totalKhataDueRupees}
+_धन्यवाद! Hussain Foods_`;
 
-_Thank you for your business!_`;
+    const url = cleanPhone.length >= 10
+      ? `https://wa.me/91${cleanPhone.slice(-10)}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  const handlePrintPdf = () => {
+    window.print();
   };
 
   if (loading) {
@@ -305,8 +332,9 @@ _Thank you for your business!_`;
 
         <div className="flex items-baseline justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
-              नया बिल <span className="text-base font-normal opacity-90">/ New Bill</span>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <span>{isEdit ? `बिल #${id}` : `नया बिल #${nextBillNo}`}</span>
+              <span className="text-base font-normal opacity-90">/ {isEdit ? 'Edit Bill' : 'New Bill'}</span>
             </h1>
             <p className="text-xs text-white/80 mt-0.5">
               Hussain Foods · {formatDate(date, 'd MMM yyyy')}
@@ -701,41 +729,44 @@ _Thank you for your business!_`;
           </div>
         </div>
 
-        {/* High-Contrast Summary Card (Dark Theme as in Prototype) */}
+        {/* High-Contrast PRD 4.2 Summary Card (Dark Mandi Theme) */}
         <div className="bg-[#1B2A1F] text-white rounded-xl p-4 space-y-2 shadow-md">
-          <div className="flex justify-between text-sm text-white/90">
+          <div className="flex justify-between text-xs text-white/80">
             <span>सामान कुल / Subtotal</span>
             <span>₹{subtotalRupees.toLocaleString('en-IN')}</span>
           </div>
 
           {deductionRupees > 0 && (
-            <div className="flex justify-between text-sm text-rose-300">
-              <span>छूट / Deduction</span>
+            <div className="flex justify-between text-xs text-rose-300">
+              <span>छूट / Deduction ({deductionReason || 'कटौती'})</span>
               <span>− ₹{deductionRupees.toLocaleString('en-IN')}</span>
             </div>
           )}
 
-          <div className="flex justify-between font-bold text-xl pt-2 border-t border-[#4A5B4E]">
-            <span>बिल कुल / Net total</span>
-            <span>₹{netTotalRupees.toLocaleString('en-IN')}</span>
+          <div className="flex justify-between font-bold text-sm pt-1.5 border-t border-[#4A5B4E]">
+            <span>आज का माल / Today's Total</span>
+            <span className="text-emerald-300 font-extrabold">₹{netTotalRupees.toLocaleString('en-IN')}</span>
           </div>
 
-          <div className="flex justify-between text-sm text-white/90 pt-1">
-            <span>मिला / Received</span>
-            <span className="font-semibold text-emerald-300">
-              ₹{receivedRupees.toLocaleString('en-IN')}
-            </span>
+          <div className="flex justify-between text-xs text-amber-300 pt-0.5">
+            <span>पिछला बाकी / Previous Due</span>
+            <span className="font-bold">₹{previousBalanceRupees.toLocaleString('en-IN')}</span>
           </div>
 
-          <div className="flex justify-between text-sm pt-0.5">
-            <span>इस बिल का बाकी / This bill due</span>
-            <span className="font-bold">₹{thisBillDueRupees.toLocaleString('en-IN')}</span>
+          <div className="flex justify-between font-extrabold text-base pt-1.5 border-t border-[#4A5B4E]/60 text-white">
+            <span>कुल हिसाब / Grand Total</span>
+            <span className="text-yellow-300">₹{(netTotalRupees + previousBalanceRupees).toLocaleString('en-IN')}</span>
           </div>
 
-          <div className="flex justify-between text-sm pt-1 text-[#F6C9C5] border-t border-[#4A5B4E]/60">
-            <span>कुल खाता बाकी / Khata due</span>
-            <span className="font-bold text-base">
-              ₹{totalKhataDueRupees.toLocaleString('en-IN')}
+          <div className="flex justify-between text-xs text-emerald-300 pt-0.5">
+            <span>जमा / Paid Now</span>
+            <span className="font-semibold">₹{receivedRupees.toLocaleString('en-IN')}</span>
+          </div>
+
+          <div className="flex justify-between font-black text-xl pt-2 text-[#F6C9C5] border-t-2 border-[#4A5B4E]">
+            <span>बकाया / Balance Due</span>
+            <span className="text-rose-400">
+              ₹{Math.max(0, netTotalRupees + previousBalanceRupees - receivedRupees).toLocaleString('en-IN')}
             </span>
           </div>
         </div>
@@ -752,36 +783,56 @@ _Thank you for your business!_`;
             <span>{saving ? 'बिल सेव हो रहा है...' : '💾 बिल सेव करें (Save Bill)'}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleShareWhatsApp}
-            className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-2xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-2xs"
-          >
-            <Share2 className="w-5 h-5 text-emerald-600" />
-            <span>📲 WhatsApp पर बिल शेयर करें (Share Bill)</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-xs rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+            >
+              <Share2 className="w-4 h-4 text-emerald-600" />
+              <span>📲 WhatsApp शेयर</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintPdf}
+              className="w-full min-h-[46px] bg-white text-gray-800 border-2 border-gray-300 font-bold text-xs rounded-xl hover:bg-gray-100 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+            >
+              <Printer className="w-4 h-4 text-gray-700" />
+              <span>📄 प्रिंट / Save PDF</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Floating Sticky Action Bar (Elevated Z-Index) */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 grid grid-cols-2 gap-3 max-w-md mx-auto z-50 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 grid grid-cols-3 gap-2 max-w-md mx-auto z-50 shadow-2xl">
         <button
           type="button"
           onClick={handleShareWhatsApp}
-          className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-sm rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-2 transition-all shadow-xs"
+          className="w-full min-h-[46px] bg-white text-[#1F6B3A] border-2 border-[#1F6B3A] font-extrabold text-xs rounded-xl hover:bg-emerald-50 active:scale-[0.98] flex items-center justify-center gap-1 transition-all shadow-xs"
         >
-          <Share2 className="w-4 h-4 text-emerald-600" />
+          <Share2 className="w-3.5 h-3.5 text-emerald-600" />
           <span>WhatsApp</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handlePrintPdf}
+          className="w-full min-h-[46px] bg-white text-gray-700 border border-gray-300 font-bold text-xs rounded-xl hover:bg-gray-50 active:scale-[0.98] flex items-center justify-center gap-1 transition-all shadow-xs"
+        >
+          <Printer className="w-3.5 h-3.5 text-gray-600" />
+          <span>PDF / प्रिंट</span>
         </button>
 
         <button
           type="button"
           disabled={saving}
           onClick={handleSubmit}
-          className="w-full min-h-[46px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
+          className="w-full min-h-[46px] bg-[#1F6B3A] hover:bg-[#18552e] active:scale-[0.98] text-white font-black text-xs rounded-xl flex items-center justify-center gap-1 shadow-md transition-all disabled:opacity-50"
         >
-          <Check className="w-5 h-5 stroke-[3]" />
-          <span>{saving ? 'सेव हो रहा...' : '💾 बिल सेव करें'}</span>
+          <Check className="w-4 h-4 stroke-[3]" />
+          <span>{saving ? '...' : '💾 सेव'}</span>
         </button>
       </div>
 
