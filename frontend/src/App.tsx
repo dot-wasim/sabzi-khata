@@ -12,6 +12,7 @@ import { BossRoute } from './components/BossRoute';
 // Pages matching User's Custom Design System
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
+import { MainDashboard } from './pages/MainDashboard';
 import { SaleList } from './pages/sales/SaleList';
 import { SaleForm } from './pages/sales/SaleForm';
 import { BuyerList } from './pages/buyers/BuyerList';
@@ -39,8 +40,8 @@ export const App: React.FC = () => {
                 {/* Authenticated Routes wrapped in Layout */}
                 <Route element={<PrivateRoute />}>
                   <Route element={<Layout />}>
-                    {/* Main Home Screen: Sell Dashboard (Exact match to User Image) */}
-                    <Route path="/" element={<SaleList />} />
+                    {/* Main Home Screen: Mode-aware Dashboard (Buy vs Sell) */}
+                    <Route path="/" element={<MainDashboard />} />
 
                     {/* Bill & Sales */}
                     <Route path="/sales" element={<SaleList />} />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useBossAuth } from '../context/BossAuthContext';
+import { useDeskMode } from '../context/DeskModeContext';
 import { login as apiLogin } from '../api/auth';
 import { verifyPin } from '../api/settings';
 
@@ -13,6 +14,7 @@ export const Login: React.FC = () => {
 
   const { login } = useAuth();
   const { unlockBoss } = useBossAuth();
+  const { setMode } = useDeskMode();
   const navigate = useNavigate();
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -61,7 +63,8 @@ export const Login: React.FC = () => {
       if (rawId.includes('buy') || rawId.includes('purchase') || rawId.includes('khareed') || rawId.includes('supplier')) {
         const data = await apiLogin(rawId, rawPass || '123456');
         login(data.token, { ...data.user, role: 'MARKET_ENTRY' });
-        navigate('/purchases');
+        setMode('buy');
+        navigate('/');
         return;
       }
 
@@ -70,7 +73,8 @@ export const Login: React.FC = () => {
       if (rawId.includes('sell') || rawId.includes('sale') || rawId.includes('counter') || rawId.includes('bill')) {
         const data = await apiLogin(rawId, rawPass || '123456');
         login(data.token, { ...data.user, role: 'MARKET_ENTRY' });
-        navigate('/sales/new');
+        setMode('sell');
+        navigate('/');
         return;
       }
 
@@ -81,6 +85,7 @@ export const Login: React.FC = () => {
       if (rawPass === '1234' || data.user.role === 'OWNER') {
         unlockBoss();
       }
+      setMode('sell');
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'लॉगिन विफल (Login failed). कृपया दोबारा प्रयास करें।');

@@ -232,25 +232,7 @@ export const PurchaseForm: React.FC = () => {
       {/* Top Header */}
       <div className="r">
         <h1 className="h">Bill</h1>
-        <div className="flex bg-[#E8EDE2] p-0.5 rounded-lg border border-[#DDE3D6]">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('sell');
-              navigate('/sales/new');
-            }}
-            className="px-2.5 py-1 text-xs font-semibold rounded-md text-[#4D5C50] hover:text-[#1B2A1F]"
-          >
-            ग्राहक बिल (Sell)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('buy')}
-            className="px-2.5 py-1 text-xs font-bold rounded-md bg-[#1F6B45] text-white shadow-xs"
-          >
-            खरीद बिल (Buy)
-          </button>
-        </div>
+        <span className="m">Supplier Inward</span>
       </div>
 
       {/* Supplier Card */}
