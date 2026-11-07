@@ -37,16 +37,20 @@ export const App: React.FC = () => {
                 {/* Authenticated Routes wrapped in Layout */}
                 <Route element={<PrivateRoute />}>
                   <Route element={<Layout />}>
-                    {/* Main Home Screen (Hussain Foods overview) */}
-                    <Route path="/" element={<Home />} />
+                    {/* Main Home Screen: Sell Dashboard (Exact match to User Image) */}
+                    <Route path="/" element={<SaleList />} />
 
-                    {/* Sell Desk */}
+                    {/* Bill & Sales */}
                     <Route path="/sales" element={<SaleList />} />
                     <Route path="/sales/new" element={<SaleForm />} />
                     <Route path="/sales/:id" element={<SaleForm />} />
                     <Route path="/sales/:id/edit" element={<SaleForm />} />
+
+                    {/* Accounts (Buyers & Sellers) */}
                     <Route path="/buyers" element={<BuyerList />} />
                     <Route path="/buyers/:id" element={<BuyerDetail />} />
+                    <Route path="/sellers" element={<SellerList />} />
+                    <Route path="/sellers/:id" element={<SellerDetail />} />
 
                     {/* Buy Desk */}
                     <Route path="/purchases" element={<PurchaseList />} />

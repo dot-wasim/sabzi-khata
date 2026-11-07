@@ -210,13 +210,6 @@ export const SaleList: React.FC = () => {
       {/* Top Header */}
       <div className="r">
         <h1 className="h">Sell Dashboard</h1>
-        <button
-          type="button"
-          onClick={() => navigate('/sales/new')}
-          className="text-xs font-bold text-[#1F6B45]"
-        >
-          + New Bill
-        </button>
       </div>
 
       {/* Tabs */}
@@ -247,7 +240,7 @@ export const SaleList: React.FC = () => {
           className={period === 'custom' ? 'on' : ''}
           onClick={() => setPeriod('custom')}
         >
-          All
+          Custom
         </button>
       </div>
 
@@ -308,7 +301,11 @@ export const SaleList: React.FC = () => {
             );
           })}
         </div>
-        <span className="m">Last 7 days sales trend</span>
+        <span className="m">
+          {dayStats.length > 0
+            ? `${dayStats[0].dateLabel} to ${dayStats[dayStats.length - 1].dateLabel}`
+            : 'Last 7 days sales trend'}
+        </span>
       </div>
 
       {/* Day by Day List */}
