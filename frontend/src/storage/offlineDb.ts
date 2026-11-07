@@ -812,7 +812,46 @@ export const offlineDb = {
 
   // Sales (Sell Desk)
   getSales: async () => {
-    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    let sales = getCollection<any>(STORAGE_KEYS.SALES);
+    // Self-healing: Ensure every sale has finalAmount, paidAmount and line totals normalized
+    let modified = false;
+    sales = sales.map((s) => {
+      const items = (s.items || []).map((it: any) => {
+        const isPending = Boolean(it.isRatePending || !it.rate || it.rate === 0);
+        const qty = parseFloat(it.quantity) || 0;
+        const rate = it.rate || 0;
+        const lineTotal = isPending ? 0 : (it.lineTotal !== undefined ? it.lineTotal : Math.round(qty * rate));
+        return {
+          ...it,
+          isRatePending: isPending,
+          lineTotal,
+        };
+      });
+
+      const itemsTotal = items.reduce((acc: number, it: any) => acc + (it.lineTotal || 0), 0);
+      const computedTotal = s.todayTotal !== undefined ? s.todayTotal : (s.finalAmount !== undefined ? s.finalAmount : itemsTotal);
+      const computedPaid = s.paidAmount !== undefined ? s.paidAmount : (s.receivedNow !== undefined ? s.receivedNow : (s.paid || 0));
+      const hasPendingRates = items.some((it: any) => it.isRatePending);
+
+      if (s.finalAmount === undefined || s.paidAmount === undefined || s.todayTotal === undefined || s.hasPendingRates !== hasPendingRates) {
+        modified = true;
+        return {
+          ...s,
+          items,
+          hasPendingRates,
+          finalAmount: computedTotal,
+          todayTotal: computedTotal,
+          totalAmount: itemsTotal,
+          paidAmount: computedPaid,
+          paid: computedPaid,
+          receivedNow: computedPaid,
+        };
+      }
+      return s;
+    });
+    if (modified) {
+      saveCollection(STORAGE_KEYS.SALES, sales);
+    }
     return { sales: sales.reverse(), pagination: { total: sales.length } };
   },
 
@@ -835,7 +874,8 @@ export const offlineDb = {
     // Calculate line totals and crate conversions
     const items = (data.items || []).map((it: any, idx: number) => {
       const qty = parseFloat(it.quantity) || 0;
-      const rate = it.rate;
+      const rate = parseFloat(it.rate) || 0;
+      const isRatePending = Boolean(it.isRatePending || rate === 0 || !it.rate);
       const unit = it.unit || 'kg';
       const crateWeightKg = it.crateWeightKg || (unit === 'crate' ? 25 : undefined);
       const convertedKg = unit === 'crate' ? qty * (crateWeightKg || 25) : qty;
@@ -844,17 +884,19 @@ export const offlineDb = {
         vegetableId: it.vegetableId,
         quantity: qty,
         unit,
-        rate,
-        lineTotal: Math.round(qty * rate),
+        rate: isRatePending ? 0 : rate,
+        isRatePending,
+        lineTotal: isRatePending ? 0 : Math.round(qty * rate),
         crateWeightKg,
         convertedKg,
       };
     });
 
+    const hasPendingRates = items.some((it: any) => it.isRatePending);
     const subtotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
     const deductionAmount = data.deductionAmount || 0;
     const todayTotal = Math.max(0, subtotal - deductionAmount);
-    const receivedNow = data.receivedNow || 0;
+    const receivedNow = data.receivedNow !== undefined ? data.receivedNow : (data.paidAmount !== undefined ? data.paidAmount : (data.paid || 0));
 
     // Previous Due from customer running balance before this bill
     const bSales = sales.filter((s) => s.buyerId === Number(data.buyerId) && !s.isVoid);
@@ -880,11 +922,17 @@ export const offlineDb = {
       deductionAmount,
       deductionReason: data.deductionReason,
       todayTotal,
+      finalAmount: todayTotal,
+      totalAmount: subtotal,
+      paidAmount: receivedNow,
+      paid: receivedNow,
       previousDue: Math.max(0, previousDue),
       grandTotal,
       receivedNow,
       balanceDue,
-      paymentMode: data.paymentMode || 'Cash',
+      hasPendingRates,
+      paymentMethod: data.paymentMethod || data.paymentMode || 'Cash',
+      paymentMode: data.paymentMode || data.paymentMethod || 'Cash',
       accountId: data.accountId,
       notes: data.notes,
       items,
@@ -918,28 +966,43 @@ export const offlineDb = {
     const idx = sales.findIndex((s) => s.id === id);
     if (idx !== -1) {
       const existing = sales[idx];
-      const items = (data.items || existing.items || []).map((it: any, i: number) => ({
-        id: it.id || (Date.now() + i),
-        vegetableId: it.vegetableId,
-        quantity: parseFloat(it.quantity) || 0,
-        unit: it.unit || 'kg',
-        rate: it.rate,
-        lineTotal: Math.round((parseFloat(it.quantity) || 0) * it.rate),
-        crateWeightKg: it.crateWeightKg || (it.unit === 'crate' ? 25 : undefined),
-        convertedKg: it.unit === 'crate' ? (parseFloat(it.quantity) || 0) * (it.crateWeightKg || 25) : (parseFloat(it.quantity) || 0),
-      }));
+      const items = (data.items || existing.items || []).map((it: any, i: number) => {
+        const qty = parseFloat(it.quantity) || 0;
+        const rate = parseFloat(it.rate) || 0;
+        const isRatePending = Boolean(it.isRatePending || rate === 0 || !it.rate);
+        return {
+          id: it.id || (Date.now() + i),
+          vegetableId: it.vegetableId,
+          quantity: qty,
+          unit: it.unit || 'kg',
+          rate: isRatePending ? 0 : rate,
+          isRatePending,
+          lineTotal: isRatePending ? 0 : Math.round(qty * rate),
+          crateWeightKg: it.crateWeightKg || (it.unit === 'crate' ? 25 : undefined),
+          convertedKg: it.unit === 'crate' ? qty * (it.crateWeightKg || 25) : qty,
+        };
+      });
+
+      const hasPendingRates = items.some((it: any) => it.isRatePending);
       const subtotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
       const deductionAmount = data.deductionAmount !== undefined ? data.deductionAmount : (existing.deductionAmount || 0);
       const todayTotal = Math.max(0, subtotal - deductionAmount);
-      const receivedNow = data.receivedNow !== undefined ? data.receivedNow : (existing.receivedNow || 0);
+      const receivedNow = data.receivedNow !== undefined ? data.receivedNow : (data.paidAmount !== undefined ? data.paidAmount : (existing.receivedNow || 0));
 
       sales[idx] = {
         ...existing,
         ...data,
         items,
+        hasPendingRates,
         deductionAmount,
         todayTotal,
+        finalAmount: todayTotal,
+        totalAmount: subtotal,
+        paidAmount: receivedNow,
+        paid: receivedNow,
         receivedNow,
+        paymentMethod: data.paymentMethod || data.paymentMode || existing.paymentMethod || 'Cash',
+        paymentMode: data.paymentMode || data.paymentMethod || existing.paymentMode || 'Cash',
         updatedAt: new Date().toISOString(),
       };
       saveCollection(STORAGE_KEYS.SALES, sales);
@@ -951,6 +1014,116 @@ export const offlineDb = {
       return sales[idx];
     }
     return null;
+  },
+
+  // 10:00 AM Mandi Rate Settlement: Settle pending rates for a vegetable across bills
+  settlePendingRate: async (vegetableId: number, ratePaise: number, targetDate?: string) => {
+    let sales = getCollection<any>(STORAGE_KEYS.SALES);
+    let updatedBillsCount = 0;
+    const targetDayStr = targetDate || new Date().toISOString().split('T')[0];
+
+    sales = sales.map((sale) => {
+      if (sale.isVoid || sale.deletedAt) return sale;
+      const saleDayStr = sale.date?.split('T')[0];
+      if (targetDayStr && saleDayStr !== targetDayStr) return sale;
+
+      let saleModified = false;
+      const updatedItems = (sale.items || []).map((it: any) => {
+        if (Number(it.vegetableId) === Number(vegetableId) && (it.isRatePending || !it.rate || it.rate === 0)) {
+          saleModified = true;
+          const qty = parseFloat(it.quantity) || 0;
+          return {
+            ...it,
+            rate: ratePaise,
+            isRatePending: false,
+            lineTotal: Math.round(qty * ratePaise),
+          };
+        }
+        return it;
+      });
+
+      if (!saleModified) return sale;
+
+      updatedBillsCount++;
+      const subtotal = updatedItems.reduce((sum: number, it: any) => sum + (it.lineTotal || 0), 0);
+      const deduction = sale.deductionAmount || 0;
+      const todayTotal = Math.max(0, subtotal - deduction);
+      const receivedNow = sale.receivedNow || sale.paidAmount || sale.paid || 0;
+      const prevDue = sale.previousDue || 0;
+      const grandTotal = todayTotal + prevDue;
+      const balanceDue = Math.max(0, grandTotal - receivedNow);
+      const stillHasPending = updatedItems.some((it: any) => it.isRatePending);
+
+      return {
+        ...sale,
+        items: updatedItems,
+        todayTotal,
+        finalAmount: todayTotal,
+        totalAmount: subtotal,
+        grandTotal,
+        balanceDue,
+        hasPendingRates: stillHasPending,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    saveCollection(STORAGE_KEYS.SALES, sales);
+
+    // Refresh all buyers dynamic balances
+    const buyers = getCollection<any>(STORAGE_KEYS.BUYERS);
+    for (const b of buyers) {
+      await offlineDb.getBuyer(b.id);
+    }
+
+    return { updatedBillsCount };
+  },
+
+  // Get all vegetables with pending rates today
+  getPendingRateVegetables: async (targetDate?: string) => {
+    const sales = getCollection<any>(STORAGE_KEYS.SALES);
+    const vegetables = getCollection<any>(STORAGE_KEYS.VEGETABLES);
+    const targetDayStr = targetDate || new Date().toISOString().split('T')[0];
+
+    const pendingMap: {
+      [vegId: number]: {
+        vegetableId: number;
+        vegetable: any;
+        totalQuantity: number;
+        unit: string;
+        billsCount: number;
+        saleIds: number[];
+      };
+    } = {};
+
+    sales.forEach((s) => {
+      if (s.isVoid || s.deletedAt) return;
+      const sDate = s.date?.split('T')[0];
+      if (targetDayStr && sDate !== targetDayStr) return;
+
+      (s.items || []).forEach((it: any) => {
+        if (it.isRatePending || !it.rate || it.rate === 0) {
+          const vId = Number(it.vegetableId);
+          if (!pendingMap[vId]) {
+            const veg = vegetables.find((v) => v.id === vId);
+            pendingMap[vId] = {
+              vegetableId: vId,
+              vegetable: veg || { id: vId, nameEn: 'Vegetable', nameHi: '' },
+              totalQuantity: 0,
+              unit: it.unit || 'kg',
+              billsCount: 0,
+              saleIds: [],
+            };
+          }
+          pendingMap[vId].totalQuantity += parseFloat(it.quantity) || 0;
+          if (!pendingMap[vId].saleIds.includes(s.id)) {
+            pendingMap[vId].saleIds.push(s.id);
+            pendingMap[vId].billsCount += 1;
+          }
+        }
+      });
+    });
+
+    return Object.values(pendingMap);
   },
 
   voidSale: async (id: number) => {

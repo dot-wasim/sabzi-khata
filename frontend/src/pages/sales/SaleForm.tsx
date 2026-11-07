@@ -21,6 +21,7 @@ interface FormLineItem {
   crateCount?: string;
   kgPerCrate?: string;
   isCrateMode?: boolean;
+  isRatePending?: boolean;
 }
 
 export const SaleForm: React.FC = () => {
@@ -95,7 +96,8 @@ export const SaleForm: React.FC = () => {
               vegetableId: it.vegetableId,
               quantity: String(it.quantity),
               unit: it.unit || 'kg',
-              rateRupees: String(paiseToRupees(it.rate)),
+              rateRupees: it.isRatePending || !it.rate ? '' : String(paiseToRupees(it.rate)),
+              isRatePending: Boolean(it.isRatePending || !it.rate),
             }))
           );
         } else if (buyersData.length > 0) {
@@ -156,6 +158,13 @@ export const SaleForm: React.FC = () => {
         }
       }
 
+      if (field === 'rateRupees') {
+        const num = parseFloat(value);
+        if (!isNaN(num) && num > 0) {
+          copy[idx].isRatePending = false;
+        }
+      }
+
       if (copy[idx].isCrateMode && (field === 'crateCount' || field === 'kgPerCrate')) {
         const crates = parseFloat(copy[idx].crateCount || '0');
         const kgPer = parseFloat(copy[idx].kgPerCrate || '25');
@@ -166,12 +175,30 @@ export const SaleForm: React.FC = () => {
     });
   };
 
+  const toggleRatePending = (idx: number) => {
+    setItems((prev) => {
+      const copy = [...prev];
+      const isCurrentlyPending = Boolean(copy[idx].isRatePending || !copy[idx].rateRupees || parseFloat(copy[idx].rateRupees) === 0);
+      copy[idx] = {
+        ...copy[idx],
+        isRatePending: !isCurrentlyPending,
+        rateRupees: !isCurrentlyPending ? '' : copy[idx].rateRupees,
+      };
+      return copy;
+    });
+  };
+
   // Calculations
   const todayTotalRupees = items.reduce((sum, it) => {
+    const rateVal = parseFloat(it.rateRupees) || 0;
+    if (it.isRatePending || rateVal === 0) return sum;
     const qty = parseFloat(it.quantity) || 0;
-    const rate = parseFloat(it.rateRupees) || 0;
-    return sum + qty * rate;
+    return sum + qty * rateVal;
   }, 0);
+
+  const hasPendingItems = items.some(
+    (it) => it.vegetableId && (it.isRatePending || !it.rateRupees || parseFloat(it.rateRupees) === 0)
+  );
 
   const grandTotalRupees = todayTotalRupees + previousDueRupees;
   const paidNowVal = parseFloat(paidNowRupees) || 0;
@@ -196,14 +223,22 @@ export const SaleForm: React.FC = () => {
         date: new Date(date).toISOString(),
         buyerId: Number(buyerId),
         billNo: isEdit ? undefined : nextBillNo,
-        items: validItems.map((it) => ({
-          vegetableId: Number(it.vegetableId),
-          quantity: parseFloat(it.quantity) || 0,
-          unit: it.unit || 'kg',
-          rate: rupeesToPaise(parseFloat(it.rateRupees) || 0),
-        })),
+        items: validItems.map((it) => {
+          const rateVal = parseFloat(it.rateRupees) || 0;
+          const isPending = Boolean(it.isRatePending || rateVal === 0);
+          return {
+            vegetableId: Number(it.vegetableId),
+            quantity: parseFloat(it.quantity) || 0,
+            unit: it.unit || 'kg',
+            rate: isPending ? 0 : rupeesToPaise(rateVal),
+            isRatePending: isPending,
+          };
+        }),
         paidAmount: rupeesToPaise(paidNowVal),
+        receivedNow: rupeesToPaise(paidNowVal),
+        paid: rupeesToPaise(paidNowVal),
         paymentMethod: paymentMode,
+        paymentMode: paymentMode,
         accountId: accountId ? Number(accountId) : undefined,
       };
 
@@ -247,10 +282,19 @@ export const SaleForm: React.FC = () => {
       .filter((it) => it.vegetableId)
       .map((it) => {
         const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
-        const lineTotal = (parseFloat(it.quantity) || 0) * (parseFloat(it.rateRupees) || 0);
+        const rateVal = parseFloat(it.rateRupees) || 0;
+        const isPending = Boolean(it.isRatePending || rateVal === 0);
+        if (isPending) {
+          return `• ${veg?.nameEn || 'Item'} (${veg?.nameHi || ''}): ${it.quantity} kg @ [⏳ भाव 10 AM पर मंडी से तय होगा]`;
+        }
+        const lineTotal = (parseFloat(it.quantity) || 0) * rateVal;
         return `• ${veg?.nameEn || 'Item'} (${veg?.nameHi || ''}): ${it.quantity} kg @ ₹${it.rateRupees} = ₹${lineTotal.toLocaleString('en-IN')}`;
       })
       .join('\n');
+
+    const pendingNote = hasPendingItems
+      ? `\n⚠️ *नोट: कुछ सब्ज़ियों का भाव 10:00 AM पर मंडी से आने के बाद कुल जोड़ अपडेट होगा।*\n`
+      : '';
 
     const slip = `*Hussain Foods — Sabzi Khata*\n` +
       `बिल #${isEdit ? id : nextBillNo} | तारीख: ${formatDate(date, 'd MMM yyyy')}\n` +
@@ -263,6 +307,7 @@ export const SaleForm: React.FC = () => {
       `*कुल जोड़ (Grand Total): ₹${grandTotalRupees.toLocaleString('en-IN')}*\n` +
       `आज जमा (Paid): ₹${paidNowVal.toLocaleString('en-IN')} (${paymentMode})\n` +
       `*बाकी (Balance Due): ₹${balanceDueRupees.toLocaleString('en-IN')}*\n` +
+      pendingNote +
       `\nधन्यवाद! 🙏 Hussain Foods`;
 
     openWhatsAppModal(slip, selectedBuyer?.phone || undefined, buyerName);
@@ -331,8 +376,9 @@ export const SaleForm: React.FC = () => {
       <div className="c">
         {items.map((item, idx) => {
           const veg = vegetables.find((v) => v.id === Number(item.vegetableId));
-          const lineTotal =
-            (parseFloat(item.quantity) || 0) * (parseFloat(item.rateRupees) || 0);
+          const rateVal = parseFloat(item.rateRupees) || 0;
+          const isPending = Boolean(item.isRatePending || rateVal === 0);
+          const lineTotal = isPending ? 0 : (parseFloat(item.quantity) || 0) * rateVal;
 
           return (
             <div key={idx} className="border-b border-[#DDE3D6] pb-2 last:border-0 last:pb-0">
@@ -363,16 +409,44 @@ export const SaleForm: React.FC = () => {
                       onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                       className="w-16 border border-[#DDE3D6] rounded-md px-2 py-0.5 text-xs bg-white"
                     />
-                    <span className="m">kg · ₹</span>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="Rate"
-                      value={item.rateRupees}
-                      onChange={(e) => handleItemChange(idx, 'rateRupees', e.target.value)}
-                      className="w-16 border border-[#DDE3D6] rounded-md px-2 py-0.5 text-xs bg-white"
-                    />
-                    <span className="m">/kg</span>
+                    <span className="m">kg ·</span>
+
+                    {isPending ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleRatePending(idx)}
+                        className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded px-2 py-0.5 flex items-center gap-1 cursor-pointer hover:bg-amber-100"
+                        title="Click to enter confirmed rate"
+                      >
+                        ⏳ भाव बाद में (10 AM)
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="m">₹</span>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="Rate"
+                          value={item.rateRupees}
+                          onChange={(e) => handleItemChange(idx, 'rateRupees', e.target.value)}
+                          className="w-16 border border-[#DDE3D6] rounded-md px-2 py-0.5 text-xs bg-white"
+                        />
+                        <span className="m">/kg</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => toggleRatePending(idx)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium border cursor-pointer ${
+                        isPending
+                          ? 'text-gray-600 bg-gray-100 border-gray-300 hover:bg-gray-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-300 hover:bg-amber-100'
+                      }`}
+                      title={isPending ? 'भाव दर्ज करें' : 'भाव बाद में छोड़ें (10 AM मंडी भाव)'}
+                    >
+                      {isPending ? '✏️ भाव भरें' : '⏳ भाव बाद में'}
+                    </button>
 
                     {items.length > 1 && (
                       <button
@@ -386,7 +460,13 @@ export const SaleForm: React.FC = () => {
                   </div>
                 </div>
 
-                <b className="text-base">₹{lineTotal.toLocaleString('en-IN')}</b>
+                {isPending ? (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                    भाव बाकी
+                  </span>
+                ) : (
+                  <b className="text-base">₹{lineTotal.toLocaleString('en-IN')}</b>
+                )}
               </div>
             </div>
           );
@@ -400,6 +480,17 @@ export const SaleForm: React.FC = () => {
           + Add vegetable
         </button>
       </div>
+
+      {/* Pending Mandi Rate Banner if any item has pending rate */}
+      {hasPendingItems && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-900">
+          <span className="text-base leading-none mt-0.5">⏳</span>
+          <div className="flex-1">
+            <b className="block text-amber-950 font-bold">मंडी भाव बाद में (Rate Pending - 10:00 AM)</b>
+            <span>इस बिल में कुछ सब्ज़ियों के भाव बाकी हैं। 10:00 AM पर मंडी का भाव तय होने पर डैशबोर्ड से 1-क्लिक में सभी बिलों का भाव भर सकेंगे।</span>
+          </div>
+        </div>
+      )}
 
       {/* Bill Totals & Payment Summary Card */}
       <div className="c">

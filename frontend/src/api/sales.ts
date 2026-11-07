@@ -30,8 +30,12 @@ export async function createSale(data: any): Promise<Sale> {
 }
 
 export async function updateSale(id: number, data: any): Promise<Sale> {
-  const res = await apiClient.put(`/sales/${id}`, data);
-  return res.data;
+  try {
+    const res = await apiClient.put(`/sales/${id}`, data);
+    return res.data;
+  } catch (err) {
+    return (await offlineDb.updateSale(id, data)) as any;
+  }
 }
 
 export async function deleteSale(id: number): Promise<void> {
@@ -44,5 +48,23 @@ export async function voidSale(id: number): Promise<Sale | null> {
     return res.data;
   } catch (err) {
     return (await offlineDb.voidSale(id)) as any;
+  }
+}
+
+export async function settlePendingRate(vegetableId: number, ratePaise: number, targetDate?: string): Promise<{ updatedBillsCount: number }> {
+  try {
+    const res = await apiClient.post('/sales/settle-pending-rate', { vegetableId, ratePaise, targetDate });
+    return res.data;
+  } catch (err) {
+    return offlineDb.settlePendingRate(vegetableId, ratePaise, targetDate);
+  }
+}
+
+export async function getPendingRateVegetables(targetDate?: string): Promise<any[]> {
+  try {
+    const res = await apiClient.get('/sales/pending-rates', { params: { date: targetDate } });
+    return res.data;
+  } catch (err) {
+    return offlineDb.getPendingRateVegetables(targetDate);
   }
 }
