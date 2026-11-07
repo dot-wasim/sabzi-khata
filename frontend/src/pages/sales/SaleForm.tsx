@@ -10,6 +10,7 @@ import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
 import { useSimulator } from '../../context/SimulatorContext';
+import { useDeskMode } from '../../context/DeskModeContext';
 import { offlineDb } from '../../storage/offlineDb';
 
 interface FormLineItem {
@@ -27,6 +28,7 @@ export const SaleForm: React.FC = () => {
   const navigate = useNavigate();
   const isEdit = !!id;
   const { openWhatsAppModal } = useSimulator();
+  const { setMode } = useDeskMode();
 
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [vegetables, setVegetables] = useState<Vegetable[]>([]);
@@ -278,17 +280,26 @@ export const SaleForm: React.FC = () => {
     <div className="s">
       {/* Top Header */}
       <div className="r">
-        <h1 className="h">Sell Desk</h1>
-        <span className="m">Works offline · backed up 2h ago</span>
-      </div>
-
-      {/* Tabs */}
-      <div className="t">
-        <button type="button" onClick={() => navigate('/')}>Home</button>
-        <button type="button" className="on">Bill</button>
-        <button type="button" onClick={() => navigate('/buyers')}>Accounts</button>
-        <button type="button" onClick={() => navigate('/vegetables')}>Vegetables</button>
-        <button type="button" onClick={() => navigate('/sales')}>Dashboard</button>
+        <h1 className="h">Bill</h1>
+        <div className="flex bg-[#E8EDE2] p-0.5 rounded-lg border border-[#DDE3D6]">
+          <button
+            type="button"
+            onClick={() => setMode('sell')}
+            className="px-2.5 py-1 text-xs font-bold rounded-md bg-[#1F6B45] text-white shadow-xs"
+          >
+            ग्राहक बिल (Sell)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('buy');
+              navigate('/purchases/new');
+            }}
+            className="px-2.5 py-1 text-xs font-semibold rounded-md text-[#4D5C50] hover:text-[#1B2A1F]"
+          >
+            खरीद बिल (Buy)
+          </button>
+        </div>
       </div>
 
       {/* Customer Header Card */}

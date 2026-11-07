@@ -9,6 +9,7 @@ import { SellerModal } from '../sellers/SellerModal';
 import { VegetableModal } from '../vegetables/VegetableModal';
 import { toInputDate, formatDate } from '../../utils/date';
 import { rupeesToPaise, paiseToRupees } from '../../utils/currency';
+import { useDeskMode } from '../../context/DeskModeContext';
 
 interface FormLineItem {
   vegetableId: number;
@@ -28,6 +29,7 @@ export const PurchaseForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEdit = !!id;
+  const { setMode } = useDeskMode();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [vegetables, setVegetables] = useState<Vegetable[]>([]);
@@ -229,17 +231,26 @@ export const PurchaseForm: React.FC = () => {
     <div className="s">
       {/* Top Header */}
       <div className="r">
-        <h1 className="h">Buy Desk</h1>
-        <span className="m">Works offline · backed up 2h ago</span>
-      </div>
-
-      {/* Tabs */}
-      <div className="t">
-        <button type="button" onClick={() => navigate('/')}>Home</button>
-        <button type="button" className="on">Purchase</button>
-        <button type="button" onClick={() => navigate('/sellers')}>Suppliers</button>
-        <button type="button" onClick={() => navigate('/vegetables')}>Vegetables</button>
-        <button type="button" onClick={() => navigate('/purchases')}>Dashboard</button>
+        <h1 className="h">Bill</h1>
+        <div className="flex bg-[#E8EDE2] p-0.5 rounded-lg border border-[#DDE3D6]">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('sell');
+              navigate('/sales/new');
+            }}
+            className="px-2.5 py-1 text-xs font-semibold rounded-md text-[#4D5C50] hover:text-[#1B2A1F]"
+          >
+            ग्राहक बिल (Sell)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('buy')}
+            className="px-2.5 py-1 text-xs font-bold rounded-md bg-[#1F6B45] text-white shadow-xs"
+          >
+            खरीद बिल (Buy)
+          </button>
+        </div>
       </div>
 
       {/* Supplier Card */}

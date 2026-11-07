@@ -6,9 +6,11 @@ import { Seller } from '../../utils/types';
 import { SellerModal } from './SellerModal';
 import { paiseToRupees } from '../../utils/currency';
 import { formatDate } from '../../utils/date';
+import { useDeskMode } from '../../context/DeskModeContext';
 
 export const SellerList: React.FC = () => {
   const navigate = useNavigate();
+  const { setMode } = useDeskMode();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -61,15 +63,27 @@ export const SellerList: React.FC = () => {
   return (
     <div className="s">
       {/* Top Header */}
-      <h1 className="h">Buy Desk · Suppliers</h1>
-
-      {/* Tabs */}
-      <div className="t">
-        <button type="button" onClick={() => navigate('/')}>Home</button>
-        <button type="button" onClick={() => navigate('/purchases/new')}>Purchase</button>
-        <button type="button" className="on">Suppliers</button>
-        <button type="button" onClick={() => navigate('/vegetables')}>Vegetables</button>
-        <button type="button" onClick={() => navigate('/purchases')}>Dashboard</button>
+      <div className="r">
+        <h1 className="h">Accounts</h1>
+        <div className="flex bg-[#E8EDE2] p-0.5 rounded-lg border border-[#DDE3D6]">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('sell');
+              navigate('/buyers');
+            }}
+            className="px-2.5 py-1 text-xs font-semibold rounded-md text-[#4D5C50] hover:text-[#1B2A1F]"
+          >
+            ग्राहक (Customers)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('buy')}
+            className="px-2.5 py-1 text-xs font-bold rounded-md bg-[#1F6B45] text-white shadow-xs"
+          >
+            सप्लायर (Suppliers)
+          </button>
+        </div>
       </div>
 
       {/* Summary Card */}

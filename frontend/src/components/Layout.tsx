@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useBossAuth } from '../context/BossAuthContext';
 import { useSimulator } from '../context/SimulatorContext';
+import { useDeskMode } from '../context/DeskModeContext';
 import { offlineDb } from '../storage/offlineDb';
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ export const Layout: React.FC = () => {
   const { user } = useAuth();
   const { isBossUnlocked } = useBossAuth();
   const { isSimulator } = useSimulator();
+  const { mode } = useDeskMode();
   const location = useLocation();
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -54,18 +56,18 @@ export const Layout: React.FC = () => {
         style={{ transform: 'translateZ(0)' }}
       >
         <div className="grid grid-cols-5 h-14">
-          {/* 1. Dashboard (Old Home) */}
+          {/* 1. Dashboard */}
           <NavLink to="/" end className={getMobileBottomItemClass()}>
             <LayoutDashboard className="w-5 h-5 mb-0.5" />
             <span>Dashboard</span>
           </NavLink>
 
-          {/* 2. Bill (Old Sell Desk) */}
+          {/* 2. Bill (Sell Customer Bill vs Buy Purchase Inward Slip) */}
           <NavLink
-            to="/sales/new"
+            to={mode === 'buy' ? '/purchases/new' : '/sales/new'}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center py-2 px-1 text-[11px] font-semibold transition-all ${
-                isActive || location.pathname.startsWith('/sales')
+                isActive || location.pathname.startsWith('/sales') || location.pathname.startsWith('/purchases')
                   ? 'text-[#1F6B45] font-bold'
                   : 'text-[#4D5C50] hover:text-[#1B2A1F]'
               }`
@@ -75,12 +77,12 @@ export const Layout: React.FC = () => {
             <span>Bill</span>
           </NavLink>
 
-          {/* 3. Accounts (Old Buy Desk) */}
+          {/* 3. Accounts (Customer Accounts vs Farmer/Supplier Accounts) */}
           <NavLink
-            to="/buyers"
+            to={mode === 'buy' ? '/sellers' : '/buyers'}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center py-2 px-1 text-[11px] font-semibold transition-all ${
-                isActive || location.pathname.startsWith('/buyers') || location.pathname.startsWith('/sellers') || location.pathname.startsWith('/purchases')
+                isActive || location.pathname.startsWith('/buyers') || location.pathname.startsWith('/sellers')
                   ? 'text-[#1F6B45] font-bold'
                   : 'text-[#4D5C50] hover:text-[#1B2A1F]'
               }`
@@ -90,7 +92,7 @@ export const Layout: React.FC = () => {
             <span>Accounts</span>
           </NavLink>
 
-          {/* 4. Vegetable (Old Boss Desk) */}
+          {/* 4. Vegetable */}
           <NavLink to="/vegetables" className={getMobileBottomItemClass()}>
             <Carrot className="w-5 h-5 mb-0.5" />
             <span>Vegetable</span>

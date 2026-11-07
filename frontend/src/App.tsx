@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { BossAuthProvider } from './context/BossAuthContext';
 import { SimulatorProvider } from './context/SimulatorContext';
+import { DeskModeProvider } from './context/DeskModeContext';
 import { MacSimulator } from './components/MacSimulator';
 import { Layout } from './components/Layout';
 import { PrivateRoute } from './components/PrivateRoute';
@@ -28,9 +29,10 @@ export const App: React.FC = () => {
   return (
     <AuthProvider>
       <BossAuthProvider>
-        <SimulatorProvider>
-          <BrowserRouter>
-            <MacSimulator>
+        <DeskModeProvider>
+          <SimulatorProvider>
+            <BrowserRouter>
+              <MacSimulator>
               <Routes>
                 <Route path="/login" element={<Login />} />
 
@@ -79,7 +81,8 @@ export const App: React.FC = () => {
             </MacSimulator>
           </BrowserRouter>
         </SimulatorProvider>
-      </BossAuthProvider>
-    </AuthProvider>
-  );
+      </DeskModeProvider>
+    </BossAuthProvider>
+  </AuthProvider>
+);
 };
