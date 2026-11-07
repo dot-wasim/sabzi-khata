@@ -17,11 +17,11 @@ interface SimulatorContextType {
 const SimulatorContext = createContext<SimulatorContextType | undefined>(undefined);
 
 export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default to true on desktop screen width (>= 800px)
+  // Default to false: render pure direct app (no simulator frame wrapper)
   const [isSimulator, setIsSimulatorState] = useState<boolean>(() => {
     const saved = localStorage.getItem('sk_simulator_mode');
     if (saved !== null) return saved === 'true';
-    return typeof window !== 'undefined' && window.innerWidth >= 800;
+    return false;
   });
 
   const [scale, setScaleState] = useState<number>(() => {

@@ -76,22 +76,9 @@ export const MacSimulator: React.FC<MacSimulatorProps> = ({ children }) => {
     compact: { width: 360, height: 780, name: 'Compact Mandi Phone' },
   }[deviceModel];
 
-  // If user switched simulator off, render raw view
+  // If simulator is disabled, render pure app directly without any simulator bars or frames
   if (!isSimulator) {
-    return (
-      <div className="relative">
-        {/* Floating Re-enable Simulator Button on top-right */}
-        <button
-          onClick={() => setIsSimulator(true)}
-          className="fixed top-3 right-3 z-50 bg-[#1F6B3A] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg hover:bg-[#18552e] flex items-center gap-1.5 transition-all"
-          title="फोन सिम्युलेटर चालू करें (Enable Phone Simulator)"
-        >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>📱 फोन सिम्युलेटर चालू करें</span>
-        </button>
-        {children}
-      </div>
-    );
+    return <>{children}</>;
   }
 
   // Active desk detector

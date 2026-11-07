@@ -93,8 +93,8 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F7F2] flex flex-col justify-end px-6 pb-12 font-sans select-none">
-      <div className="max-w-sm w-full mx-auto space-y-6">
+    <div className="min-h-screen bg-[#F6F7F2] flex flex-col justify-end px-6 pb-12 font-sans select-none max-w-[440px] mx-auto">
+      <div className="w-full space-y-6">
         {/* Title */}
         <h1 className="text-3xl font-extrabold text-[#1B2A1F] tracking-tight">
           Log in
@@ -111,7 +111,7 @@ export const Login: React.FC = () => {
               type="text"
               value={idInput}
               onChange={(e) => setIdInput(e.target.value)}
-              placeholder="e.g. sell, buy, boss or phone"
+              placeholder=""
               autoCapitalize="none"
               autoCorrect="off"
               className="w-full min-h-[50px] bg-white border border-[#DDE3D6] rounded-xl px-4 text-[#1B2A1F] font-medium text-base focus:outline-none focus:border-[#1F6B45] focus:ring-1 focus:ring-[#1F6B45] transition-all"
@@ -127,7 +127,7 @@ export const Login: React.FC = () => {
               type="password"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="••••••••"
+              placeholder=""
               className="w-full min-h-[50px] bg-white border border-[#DDE3D6] rounded-xl px-4 text-[#1B2A1F] font-medium text-base focus:outline-none focus:border-[#1F6B45] focus:ring-1 focus:ring-[#1F6B45] transition-all"
             />
           </div>
@@ -148,13 +148,6 @@ export const Login: React.FC = () => {
             {loading ? 'Logging in...' : 'Log in'}
           </button>
         </form>
-
-        {/* Quick Desk Guide */}
-        <div className="pt-2 text-center">
-          <p className="text-[11px] text-gray-500 font-medium">
-            Quick Desk IDs: <span className="text-[#1F6B45] font-bold">sell</span> (Sell Desk) · <span className="text-[#1F6B45] font-bold">buy</span> (Buy Desk) · <span className="text-[#1F6B45] font-bold">boss</span> (PIN 1234)
-          </p>
-        </div>
       </div>
     </div>
   );
