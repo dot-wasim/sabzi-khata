@@ -50,6 +50,7 @@ export const SaleForm: React.FC = () => {
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'UPI' | 'BANK' | 'CHEQUE'>('UPI');
   const [accountId, setAccountId] = useState<number | ''>('');
   const [nextBillNo, setNextBillNo] = useState<number>(1);
+  const [currentBillNo, setCurrentBillNo] = useState<number | string>('');
   const [savedSaleId, setSavedSaleId] = useState<number | null>(null);
   const [customerRecentEntries, setCustomerRecentEntries] = useState<any[]>([]);
   const [showSavedModal, setShowSavedModal] = useState(false);
@@ -86,20 +87,23 @@ export const SaleForm: React.FC = () => {
 
         if (isEdit) {
           const s = await getSale(parseInt(id));
-          setDate(toInputDate(new Date(s.date)));
-          setBuyerId(s.buyerId);
-          setAccountId(s.accountId || (defaultAcc ? defaultAcc.id : ''));
-          setPaidNowRupees(String(paiseToRupees((s as any).paidAmount || (s as any).paid || 0)));
-          setSavedSaleId(s.id);
-          setItems(
-            s.items.map((it: any) => ({
-              vegetableId: it.vegetableId,
-              quantity: String(it.quantity),
-              unit: it.unit || 'kg',
-              rateRupees: it.isRatePending || !it.rate ? '' : String(paiseToRupees(it.rate)),
-              isRatePending: Boolean(it.isRatePending || !it.rate),
-            }))
-          );
+          if (s) {
+            setCurrentBillNo(s.billNo || s.id);
+            setDate(toInputDate(new Date(s.date)));
+            setBuyerId(s.buyerId);
+            setAccountId(s.accountId || (defaultAcc ? defaultAcc.id : ''));
+            setPaidNowRupees(String(paiseToRupees((s as any).paidAmount || (s as any).paid || 0)));
+            setSavedSaleId(s.id);
+            setItems(
+              (s.items || []).map((it: any) => ({
+                vegetableId: it.vegetableId,
+                quantity: String(it.quantity),
+                unit: it.unit || 'kg',
+                rateRupees: it.isRatePending || !it.rate ? '' : String(paiseToRupees(it.rate)),
+                isRatePending: Boolean(it.isRatePending || !it.rate),
+              }))
+            );
+          }
         } else if (buyersData.length > 0) {
           setBuyerId(buyersData[0].id);
         }
@@ -162,6 +166,8 @@ export const SaleForm: React.FC = () => {
         const num = parseFloat(value);
         if (!isNaN(num) && num > 0) {
           copy[idx].isRatePending = false;
+        } else if (value === '' || num === 0) {
+          copy[idx].isRatePending = true;
         }
       }
 
@@ -324,10 +330,40 @@ export const SaleForm: React.FC = () => {
   return (
     <div className="s">
       {/* Top Header */}
-      <div className="r">
-        <h1 className="h">Bill</h1>
-        <span className="m">Works offline</span>
+      <div className="r items-start">
+        <div>
+          <h1 className="h flex items-center gap-2">
+            {isEdit ? `Edit Bill #${currentBillNo || id}` : 'Bill'}
+            {isEdit && hasPendingItems && (
+              <span className="text-[11px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold">
+                ⏳ भाव बाकी
+              </span>
+            )}
+          </h1>
+          <span className="m text-xs">
+            {isEdit ? 'जिसका भाव पता हो भरें, बाकी बाद के लिए छोड़ सकते हैं' : 'Works offline'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-[#DDE3D6] px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors"
+        >
+          ← Dashboard
+        </button>
       </div>
+
+      {isEdit && hasPendingItems && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-950">
+          <span className="text-base leading-none mt-0.5">ℹ️</span>
+          <div>
+            <b>जिस सब्ज़ी का भाव पता हो उसका भाव भरें।</b>
+            <p className="mt-0.5 text-amber-900">
+              अगर किसी सब्ज़ी का भाव अभी पता न हो, तो उसका भाव बॉक्स खाली छोड़ दें (बाद में कभी भी एडिट करके भर सकते हैं)।
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Customer Header Card */}
       <div className="c">
@@ -400,52 +436,42 @@ export const SaleForm: React.FC = () => {
                     {veg && <span className="m">{veg.nameHi}</span>}
                   </div>
 
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                     <input
                       type="number"
                       step="any"
                       placeholder="Qty"
                       value={item.quantity}
                       onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                      className="w-16 border border-[#DDE3D6] rounded-md px-2 py-0.5 text-xs bg-white"
+                      className="w-16 border border-[#DDE3D6] rounded-md px-2 py-1 text-xs bg-white font-semibold"
                     />
-                    <span className="m">kg ·</span>
+                    <span className="m text-xs">kg · ₹</span>
 
-                    {isPending ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleRatePending(idx)}
-                        className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded px-2 py-0.5 flex items-center gap-1 cursor-pointer hover:bg-amber-100"
-                        title="Click to enter confirmed rate"
-                      >
-                        ⏳ भाव बाद में (10 AM)
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <span className="m">₹</span>
-                        <input
-                          type="number"
-                          step="any"
-                          placeholder="Rate"
-                          value={item.rateRupees}
-                          onChange={(e) => handleItemChange(idx, 'rateRupees', e.target.value)}
-                          className="w-16 border border-[#DDE3D6] rounded-md px-2 py-0.5 text-xs bg-white"
-                        />
-                        <span className="m">/kg</span>
-                      </div>
-                    )}
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={isPending ? "भाव बाकी" : "Rate"}
+                      value={item.rateRupees}
+                      onChange={(e) => handleItemChange(idx, 'rateRupees', e.target.value)}
+                      className={`w-20 border rounded-md px-2 py-1 text-xs font-semibold ${
+                        isPending
+                          ? 'border-amber-300 bg-amber-50/70 text-amber-900 placeholder:text-amber-700'
+                          : 'border-[#DDE3D6] bg-white'
+                      }`}
+                    />
+                    <span className="m text-xs">/kg</span>
 
                     <button
                       type="button"
                       onClick={() => toggleRatePending(idx)}
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium border cursor-pointer ${
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium border cursor-pointer transition-colors ${
                         isPending
-                          ? 'text-gray-600 bg-gray-100 border-gray-300 hover:bg-gray-200'
-                          : 'text-amber-800 bg-amber-50 border-amber-300 hover:bg-amber-100'
+                          ? 'text-amber-800 bg-amber-100 border-amber-300 hover:bg-amber-200'
+                          : 'text-gray-600 bg-gray-50 border-gray-300 hover:bg-amber-50'
                       }`}
-                      title={isPending ? 'भाव दर्ज करें' : 'भाव बाद में छोड़ें (10 AM मंडी भाव)'}
+                      title={isPending ? "भाव दर्ज करने के लिए रेट बॉक्स में टाइप करें" : "भाव बाद में भरने के लिए खाली छोड़ें"}
                     >
-                      {isPending ? '✏️ भाव भरें' : '⏳ भाव बाद में'}
+                      {isPending ? '⏳ बाद में (Later)' : 'भाव बाद में?'}
                     </button>
 
                     {items.length > 1 && (
@@ -599,8 +625,16 @@ export const SaleForm: React.FC = () => {
         onClick={handleSaveBill}
         className="b"
       >
-        {saving ? 'Saving...' : 'Save Bill'}
+        {saving
+          ? (isEdit ? 'Updating Bill...' : 'Saving Bill...')
+          : (isEdit ? '✓ बिल अपडेट करें (Update Bill)' : 'Save Bill')}
       </button>
+
+      {hasPendingItems && (
+        <p className="text-center text-[11px] text-amber-800 font-medium -mt-1">
+          * जो भाव खाली छोड़े हैं, वे बाद में कभी भी एडिट करके भरे जा सकते हैं।
+        </p>
+      )}
 
       <button
         type="button"
@@ -626,10 +660,17 @@ export const SaleForm: React.FC = () => {
               <div className="w-12 h-12 bg-[#1F6B45] text-white rounded-full flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
                 ✓
               </div>
-              <h2 className="text-lg font-bold text-[#1B2A1F]">बिल सेव हो गया! (Bill Saved)</h2>
+              <h2 className="text-lg font-bold text-[#1B2A1F]">
+                {isEdit ? 'बिल अपडेट हो गया! (Bill Updated)' : 'बिल सेव हो गया! (Bill Saved)'}
+              </h2>
               <p className="text-xs text-gray-600">
                 Bill #{savedBillSummary.billNo} · {savedBillSummary.customerName}
               </p>
+              {hasPendingItems && (
+                <span className="inline-block text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md mt-1">
+                  ⏳ बाकी भाव बाद में कभी भी भरे जा सकते हैं
+                </span>
+              )}
             </div>
 
             <div className="bg-white rounded-xl p-3 border border-[#DDE3D6] space-y-2 text-sm">

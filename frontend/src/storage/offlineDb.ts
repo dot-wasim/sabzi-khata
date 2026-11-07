@@ -988,6 +988,9 @@ export const offlineDb = {
       const deductionAmount = data.deductionAmount !== undefined ? data.deductionAmount : (existing.deductionAmount || 0);
       const todayTotal = Math.max(0, subtotal - deductionAmount);
       const receivedNow = data.receivedNow !== undefined ? data.receivedNow : (data.paidAmount !== undefined ? data.paidAmount : (existing.receivedNow || 0));
+      const previousDue = existing.previousDue !== undefined ? existing.previousDue : 0;
+      const grandTotal = todayTotal + Math.max(0, previousDue);
+      const balanceDue = Math.max(0, grandTotal - receivedNow);
 
       sales[idx] = {
         ...existing,
@@ -998,6 +1001,8 @@ export const offlineDb = {
         todayTotal,
         finalAmount: todayTotal,
         totalAmount: subtotal,
+        grandTotal,
+        balanceDue,
         paidAmount: receivedNow,
         paid: receivedNow,
         receivedNow,

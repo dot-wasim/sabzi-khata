@@ -11,6 +11,7 @@ export const SaleList: React.FC = () => {
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<'today' | '7days' | 'month' | 'custom'>('7days');
+  const [billFilter, setBillFilter] = useState<'all' | 'pending'>('all');
   const [sales, setSales] = useState<any[]>([]);
   const [buyers, setBuyers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -441,14 +442,51 @@ export const SaleList: React.FC = () => {
       <div className="c">
         <div className="r">
           <b>Recent Bills · हाल के बिल</b>
-          <span className="m font-bold text-xs text-[#1F6B45]">
-            {filteredSales.length} bill{filteredSales.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setBillFilter('all')}
+              className={`text-xs px-2.5 py-1 rounded-md font-bold cursor-pointer transition-colors ${
+                billFilter === 'all'
+                  ? 'bg-[#1F6B45] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              सभी ({filteredSales.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillFilter('pending')}
+              className={`text-xs px-2.5 py-1 rounded-md font-bold cursor-pointer transition-colors ${
+                billFilter === 'pending'
+                  ? 'bg-[#B4540A] text-white'
+                  : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              ⏳ भाव बाकी ({filteredSales.filter((s) => s.hasPendingRates || (s.items || []).some((it: any) => it.isRatePending)).length})
+            </button>
+          </div>
         </div>
-        {filteredSales.length === 0 ? (
-          <span className="m">इस अवधि में कोई बिल नहीं बना</span>
-        ) : (
-          filteredSales.slice(0, 8).map((s) => {
+
+        {(() => {
+          const displaySales = filteredSales.filter((s) => {
+            if (billFilter === 'pending') {
+              return s.hasPendingRates || (s.items || []).some((it: any) => it.isRatePending);
+            }
+            return true;
+          });
+
+          if (displaySales.length === 0) {
+            return (
+              <span className="m py-2 block text-center">
+                {billFilter === 'pending'
+                  ? '✓ किसी भी बिल में भाव बाकी नहीं है!'
+                  : 'इस अवधि में कोई बिल नहीं बना'}
+              </span>
+            );
+          }
+
+          return displaySales.slice(0, 10).map((s) => {
             const buyer = buyers.find((b) => b.id === s.buyerId) || s.buyer;
             const bName = buyer?.name || 'Customer';
             const sTotal = s.finalAmount !== undefined ? s.finalAmount : (s.todayTotal !== undefined ? s.todayTotal : (s.totalAmount || 0));
@@ -458,7 +496,8 @@ export const SaleList: React.FC = () => {
             const itemsSummary = (s.items || [])
               .map((it: any) => {
                 const veg = vegetables.find((v) => v.id === it.vegetableId);
-                return `${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} ${it.quantity}kg`;
+                const isItemPending = it.isRatePending || !it.rate;
+                return `${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} ${it.quantity}kg${isItemPending ? ' (भाव बाकी)' : ''}`;
               })
               .join(', ');
 
@@ -466,36 +505,54 @@ export const SaleList: React.FC = () => {
               <div
                 key={s.id}
                 onClick={() => navigate(`/sales/${s.id}`)}
-                className="border-b border-[#DDE3D6] pb-2 last:border-0 last:pb-0 cursor-pointer hover:bg-emerald-50/60 p-1.5 rounded-lg transition-colors"
+                className="border-b border-[#DDE3D6] pb-2 last:border-0 last:pb-0 cursor-pointer hover:bg-emerald-50/60 p-2 rounded-lg transition-colors"
               >
-                <div className="r">
-                  <div>
-                    <div className="flex items-center gap-1.5">
+                <div className="r items-center">
+                  <div className="flex-1 pr-2">
+                    <div className="flex items-center gap-2">
                       <b className="text-sm">Bill #{s.billNo || s.id}</b>
-                      <span className="text-sm font-semibold">{bName}</span>
+                      <span className="text-sm font-semibold text-[#1B2A1F]">{bName}</span>
                     </div>
-                    <span className="m text-xs">
+                    <span className="m text-xs block mt-0.5">
                       {formatDate(s.date, 'd MMM, h:mm a')} · {itemsSummary || 'Produce'}
                     </span>
                   </div>
 
-                  <div className="text-right">
-                    {hasPending ? (
-                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
-                        ⏳ भाव बाकी
-                      </span>
-                    ) : (
-                      <b className="text-sm">₹{paiseToRupees(sTotal).toLocaleString('en-IN')}</b>
-                    )}
-                    <div className="text-[11px] text-[#1F6B45] font-semibold">
-                      जमा: ₹{paiseToRupees(sPaid).toLocaleString('en-IN')}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      {hasPending ? (
+                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
+                          ⏳ भाव बाकी
+                        </span>
+                      ) : (
+                        <b className="text-sm">₹{paiseToRupees(sTotal).toLocaleString('en-IN')}</b>
+                      )}
+                      <div className="text-[11px] text-[#1F6B45] font-semibold">
+                        जमा: ₹{paiseToRupees(sPaid).toLocaleString('en-IN')}
+                      </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/sales/${s.id}`);
+                      }}
+                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors ${
+                        hasPending
+                          ? 'bg-[#B4540A] hover:bg-amber-800 text-white'
+                          : 'bg-white hover:bg-gray-100 text-[#1B2A1F] border border-[#DDE3D6]'
+                      }`}
+                      title={hasPending ? "इस बिल में भाव भरें" : "बिल एडिट करें"}
+                    >
+                      {hasPending ? '✏️ भाव भरें' : '✏️ Edit'}
+                    </button>
                   </div>
                 </div>
               </div>
             );
-          })
-        )}
+          });
+        })()}
       </div>
 
       {/* Quick Action Button */}
