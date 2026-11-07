@@ -1,41 +1,34 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSales, settlePendingRate, getPendingRateVegetables } from '../../api/sales';
+import { getSales } from '../../api/sales';
 import { getBuyers } from '../../api/buyers';
 import { getPayments } from '../../api/payments';
 import { getVegetables } from '../../api/vegetables';
-import { paiseToRupees, rupeesToPaise } from '../../utils/currency';
+import { paiseToRupees } from '../../utils/currency';
 import { formatDate } from '../../utils/date';
 
 export const SaleList: React.FC = () => {
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<'today' | '7days' | 'month' | 'custom'>('7days');
-  const [billFilter, setBillFilter] = useState<'all' | 'pending'>('all');
   const [sales, setSales] = useState<any[]>([]);
   const [buyers, setBuyers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [vegetables, setVegetables] = useState<any[]>([]);
-  const [pendingVegs, setPendingVegs] = useState<any[]>([]);
-  const [settleModalOpen, setSettleModalOpen] = useState(false);
-  const [settleRatesInput, setSettleRatesInput] = useState<{ [vegId: number]: string }>({});
-  const [settling, setSettling] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const [salesRes, buyersRes, paymentsRes, vegsRes, pendingData] = await Promise.all([
+      const [salesRes, buyersRes, paymentsRes, vegsRes] = await Promise.all([
         getSales({ limit: 1000 }).catch(() => ({ sales: [] })),
         getBuyers().catch(() => []),
         getPayments({ limit: 1000 }).catch(() => ({ payments: [] })),
         getVegetables().catch(() => []),
-        getPendingRateVegetables().catch(() => []),
       ]);
       setSales(Array.isArray(salesRes) ? salesRes : (salesRes as any)?.sales || []);
       setBuyers(Array.isArray(buyersRes) ? buyersRes : []);
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : (paymentsRes as any)?.payments || []);
       setVegetables(Array.isArray(vegsRes) ? vegsRes : []);
-      setPendingVegs(pendingData || []);
     } catch (err) {
       console.error('Failed to load Sell Dashboard data:', err);
     } finally {
@@ -46,30 +39,6 @@ export const SaleList: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleSettleVegetableRate = async (vegId: number) => {
-    const rateRupees = parseFloat(settleRatesInput[vegId] || '0');
-    if (!rateRupees || rateRupees <= 0) {
-      alert('कृपया सही भाव दर्ज करें (Enter valid rate in ₹/kg)');
-      return;
-    }
-    setSettling(true);
-    try {
-      const res = await settlePendingRate(vegId, rupeesToPaise(rateRupees));
-      alert(`सफलतापूर्वक ${res.updatedBillsCount} बिलों में भाव ₹${rateRupees}/kg लागू कर दिया गया!`);
-      await fetchData();
-      // If no more pending vegs, close modal
-      const remaining = await getPendingRateVegetables().catch(() => []);
-      setPendingVegs(remaining || []);
-      if (!remaining || remaining.length === 0) {
-        setSettleModalOpen(false);
-      }
-    } catch (err: any) {
-      alert(`त्रुटि: ${err.message || 'भाव अपडेट नहीं हो पाया'}`);
-    } finally {
-      setSettling(false);
-    }
-  };
 
   // Filter sales & payments by selected period
   const filteredSales = useMemo(() => {
@@ -253,32 +222,6 @@ export const SaleList: React.FC = () => {
         <h1 className="h">Sell Dashboard</h1>
       </div>
 
-      {/* 10:00 AM Mandi Pending Rates Settlement Banner */}
-      {pendingVegs.length > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-3.5 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">⏳</span>
-              <div>
-                <b className="text-sm text-amber-950 font-bold block">
-                  आज के मंडी भाव बाकी हैं (10:00 AM Settlement)
-                </b>
-                <span className="text-xs text-amber-900">
-                  {pendingVegs.length} सब्ज़ियों के भाव आने बाकी हैं ({pendingVegs.reduce((acc, p) => acc + (p.billsCount || 1), 0)} बिल प्रभावित)
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSettleModalOpen(true)}
-              className="bg-[#B4540A] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xs hover:bg-amber-800 cursor-pointer flex items-center gap-1"
-            >
-              ⚡ भाव भरें
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="t">
         <button
@@ -442,62 +385,25 @@ export const SaleList: React.FC = () => {
       <div className="c">
         <div className="r">
           <b>Recent Bills · हाल के बिल</b>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setBillFilter('all')}
-              className={`text-xs px-2.5 py-1 rounded-md font-bold cursor-pointer transition-colors ${
-                billFilter === 'all'
-                  ? 'bg-[#1F6B45] text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              सभी ({filteredSales.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setBillFilter('pending')}
-              className={`text-xs px-2.5 py-1 rounded-md font-bold cursor-pointer transition-colors ${
-                billFilter === 'pending'
-                  ? 'bg-[#B4540A] text-white'
-                  : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
-              }`}
-            >
-              ⏳ भाव बाकी ({filteredSales.filter((s) => s.hasPendingRates || (s.items || []).some((it: any) => it.isRatePending)).length})
-            </button>
-          </div>
+          <span className="m font-bold text-xs text-[#1F6B45]">
+            {filteredSales.length} bill{filteredSales.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
-        {(() => {
-          const displaySales = filteredSales.filter((s) => {
-            if (billFilter === 'pending') {
-              return s.hasPendingRates || (s.items || []).some((it: any) => it.isRatePending);
-            }
-            return true;
-          });
-
-          if (displaySales.length === 0) {
-            return (
-              <span className="m py-2 block text-center">
-                {billFilter === 'pending'
-                  ? '✓ किसी भी बिल में भाव बाकी नहीं है!'
-                  : 'इस अवधि में कोई बिल नहीं बना'}
-              </span>
-            );
-          }
-
-          return displaySales.slice(0, 10).map((s) => {
+        {filteredSales.length === 0 ? (
+          <span className="m py-2 block text-center">इस अवधि में कोई बिल नहीं बना</span>
+        ) : (
+          filteredSales.slice(0, 10).map((s) => {
             const buyer = buyers.find((b) => b.id === s.buyerId) || s.buyer;
             const bName = buyer?.name || 'Customer';
             const sTotal = s.finalAmount !== undefined ? s.finalAmount : (s.todayTotal !== undefined ? s.todayTotal : (s.totalAmount || 0));
             const sPaid = s.paidAmount !== undefined ? s.paidAmount : (s.receivedNow !== undefined ? s.receivedNow : (s.paid || 0));
-            const hasPending = s.hasPendingRates || (s.items || []).some((it: any) => it.isRatePending);
 
             const itemsSummary = (s.items || [])
               .map((it: any) => {
                 const veg = vegetables.find((v) => v.id === it.vegetableId);
-                const isItemPending = it.isRatePending || !it.rate;
-                return `${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} ${it.quantity}kg${isItemPending ? ' (भाव बाकी)' : ''}`;
+                const rateText = it.rate ? `@ ₹${paiseToRupees(it.rate)}` : '';
+                return `${veg?.nameHi || veg?.nameEn || 'सब्ज़ी'} ${it.quantity}kg ${rateText}`.trim();
               })
               .join(', ');
 
@@ -520,13 +426,7 @@ export const SaleList: React.FC = () => {
 
                   <div className="flex items-center gap-2">
                     <div className="text-right">
-                      {hasPending ? (
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
-                          ⏳ भाव बाकी
-                        </span>
-                      ) : (
-                        <b className="text-sm">₹{paiseToRupees(sTotal).toLocaleString('en-IN')}</b>
-                      )}
+                      <b className="text-sm block">₹{paiseToRupees(sTotal).toLocaleString('en-IN')}</b>
                       <div className="text-[11px] text-[#1F6B45] font-semibold">
                         जमा: ₹{paiseToRupees(sPaid).toLocaleString('en-IN')}
                       </div>
@@ -538,21 +438,17 @@ export const SaleList: React.FC = () => {
                         e.stopPropagation();
                         navigate(`/sales/${s.id}`);
                       }}
-                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors ${
-                        hasPending
-                          ? 'bg-[#B4540A] hover:bg-amber-800 text-white'
-                          : 'bg-white hover:bg-gray-100 text-[#1B2A1F] border border-[#DDE3D6]'
-                      }`}
-                      title={hasPending ? "इस बिल में भाव भरें" : "बिल एडिट करें"}
+                      className="bg-emerald-50 hover:bg-[#1F6B45] text-[#1F6B45] hover:text-white border border-[#1F6B45]/30 text-xs font-bold px-2.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="बिल एडिट करें / भाव भरें"
                     >
-                      {hasPending ? '✏️ भाव भरें' : '✏️ Edit'}
+                      ✏️ Edit
                     </button>
                   </div>
                 </div>
               </div>
             );
-          });
-        })()}
+          })
+        )}
       </div>
 
       {/* Quick Action Button */}
@@ -563,91 +459,6 @@ export const SaleList: React.FC = () => {
       >
         + Create Daily Bill
       </button>
-
-      {/* Settle Rates Modal (10:00 AM Mandi Rate Settler) */}
-      {settleModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-[#F6F7F2] border-2 border-[#1F6B45] rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#DDE3D6] pb-3">
-              <div>
-                <h2 className="text-base font-bold text-[#1B2A1F]">10:00 AM मंडी भाव तय करें</h2>
-                <p className="text-xs text-gray-600">आज सुबह के बिलों में पेंडिंग भाव दर्ज करें</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSettleModalOpen(false)}
-                className="text-gray-500 hover:text-black font-bold text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              {pendingVegs.length === 0 ? (
-                <div className="text-center py-4 text-xs text-gray-600">
-                  ✓ आज की सभी सब्ज़ियों के भाव तय हो चुके हैं!
-                </div>
-              ) : (
-                pendingVegs.map((pv) => {
-                  const veg = pv.vegetable;
-                  const currentInput = settleRatesInput[pv.vegetableId] || '';
-                  return (
-                    <div key={pv.vegetableId} className="bg-white border border-[#DDE3D6] rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <b className="text-sm text-[#1B2A1F] block">{veg?.nameEn} ({veg?.nameHi})</b>
-                          <span className="text-[11px] text-gray-500">
-                            कुल बिका: {pv.totalQuantity} {pv.unit} ({pv.billsCount} बिल)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 flex-1">
-                          <span className="text-sm font-semibold">₹</span>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="आज का भाव (Rate)"
-                            value={currentInput}
-                            onChange={(e) =>
-                              setSettleRatesInput((prev) => ({
-                                ...prev,
-                                [pv.vegetableId]: e.target.value,
-                              }))
-                            }
-                            className="w-full border border-[#DDE3D6] rounded-lg px-2.5 py-1.5 text-sm font-bold bg-[#F6F7F2] focus:bg-white"
-                          />
-                          <span className="text-xs text-gray-500">/kg</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={settling}
-                          onClick={() => handleSettleVegetableRate(pv.vegetableId)}
-                          className="bg-[#1F6B45] hover:bg-[#165034] text-white text-xs font-bold px-3 py-2 rounded-lg cursor-pointer whitespace-nowrap shadow-xs"
-                        >
-                          {settling ? 'लागू हो रहा है...' : '✓ भाव लागू करें'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="border-t border-[#DDE3D6] pt-3">
-              <button
-                type="button"
-                onClick={() => setSettleModalOpen(false)}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-xl text-xs cursor-pointer"
-              >
-                बंद करें (Close)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

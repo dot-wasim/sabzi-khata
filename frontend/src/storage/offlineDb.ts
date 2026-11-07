@@ -855,9 +855,9 @@ export const offlineDb = {
     return { sales: sales.reverse(), pagination: { total: sales.length } };
   },
 
-  getSale: async (id: number) => {
+  getSale: async (id: number | string) => {
     const sales = getCollection<any>(STORAGE_KEYS.SALES);
-    return sales.find((s) => s.id === id);
+    return sales.find((s) => Number(s.id) === Number(id) || String(s.id) === String(id));
   },
 
   createSale: async (data: any) => {
@@ -961,9 +961,9 @@ export const offlineDb = {
     return newSale;
   },
 
-  updateSale: async (id: number, data: any) => {
+  updateSale: async (id: number | string, data: any) => {
     const sales = getCollection<any>(STORAGE_KEYS.SALES);
-    const idx = sales.findIndex((s) => s.id === id);
+    const idx = sales.findIndex((s) => Number(s.id) === Number(id) || String(s.id) === String(id));
     if (idx !== -1) {
       const existing = sales[idx];
       const items = (data.items || existing.items || []).map((it: any, i: number) => {

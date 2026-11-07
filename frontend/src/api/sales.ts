@@ -11,7 +11,7 @@ export async function getSales(params?: { page?: number; limit?: number; from?: 
   }
 }
 
-export async function getSale(id: number): Promise<Sale> {
+export async function getSale(id: number | string): Promise<Sale> {
   try {
     const res = await apiClient.get(`/sales/${id}`);
     return res.data;
@@ -29,7 +29,7 @@ export async function createSale(data: any): Promise<Sale> {
   }
 }
 
-export async function updateSale(id: number, data: any): Promise<Sale> {
+export async function updateSale(id: number | string, data: any): Promise<Sale> {
   try {
     const res = await apiClient.put(`/sales/${id}`, data);
     return res.data;
