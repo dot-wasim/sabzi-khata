@@ -221,8 +221,9 @@ export const SaleForm: React.FC = () => {
 
       let resultId = savedSaleId;
       if (isEdit && id) {
-        await updateSale(id, payload);
-        resultId = Number(id);
+        const targetId = savedSaleId || id;
+        await updateSale(targetId, payload);
+        resultId = Number(targetId);
       } else {
         const res = await createSale(payload);
         resultId = res.id;

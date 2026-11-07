@@ -307,6 +307,9 @@ export const offlineDb = {
     const allChronological: any[] = [];
     salesEntries.forEach((s) => {
       allChronological.push({
+        ...s,
+        id: s.id,
+        saleId: s.saleId || s.id,
         date: s.date,
         rawDate: s.rawDate,
         type: 'SALE',
@@ -315,12 +318,21 @@ export const offlineDb = {
         notes: s.notes,
         debit: s.debit,
         credit: 0,
+        items: s.items || [],
+        todayTotal: s.todayTotal,
+        previousDue: s.previousDue,
+        grandTotal: s.grandTotal,
+        balanceDue: s.balanceDue,
+        receivedNow: s.receivedNow,
+        paymentMode: s.paymentMode,
       });
       if (s.receivedNow > 0) {
         allChronological.push({
           date: s.date,
           rawDate: s.rawDate + 1, // slightly after sale
           type: 'PAYMENT',
+          id: `pay-${s.id}`,
+          saleId: s.saleId || s.id,
           billNo: s.billNo,
           referenceId: `जमा (${s.paymentMode})`,
           notes: `जमा (${s.paymentMode})`,
@@ -336,8 +348,9 @@ export const offlineDb = {
     allChronological.forEach((entry) => {
       runningBalance = runningBalance + entry.debit - entry.credit;
       entries.push({
-        id: entry.id,
-        saleId: entry.saleId,
+        ...entry,
+        id: entry.id || entry.saleId,
+        saleId: entry.saleId || entry.id,
         date: entry.date,
         type: entry.type,
         referenceId: entry.referenceId,
@@ -347,11 +360,12 @@ export const offlineDb = {
         credit: entry.credit,
         balance: runningBalance,
         runningBalance: runningBalance,
-        items: entry.items,
+        items: entry.items || [],
         todayTotal: entry.todayTotal,
         previousDue: entry.previousDue,
         grandTotal: entry.grandTotal,
         balanceDue: entry.balanceDue,
+        receivedNow: entry.receivedNow || 0,
         paymentMode: entry.paymentMode,
       });
     });
@@ -506,6 +520,9 @@ export const offlineDb = {
     const allChronological: any[] = [];
     purchasesEntries.forEach((p) => {
       allChronological.push({
+        ...p,
+        id: p.id || p.purchaseId,
+        purchaseId: p.purchaseId || p.id,
         date: p.date,
         rawDate: p.rawDate,
         type: 'PURCHASE',
@@ -513,12 +530,20 @@ export const offlineDb = {
         credit: p.credit,
         debit: 0,
         referenceId: p.referenceId,
+        items: p.items || [],
+        transport: p.transport || 0,
+        labour: p.labour || 0,
+        badGoods: p.badGoods || [],
+        paidNow: p.paidNow || 0,
+        paymentMode: p.paymentMode,
       });
       if (p.paidNow > 0) {
         allChronological.push({
           date: p.date,
           rawDate: p.rawDate + 1,
           type: 'PAYMENT',
+          id: `pay-${p.id}`,
+          purchaseId: p.purchaseId || p.id,
           notes: `भुगतान (${p.paymentMode})`,
           credit: 0,
           debit: p.paidNow,
@@ -533,8 +558,9 @@ export const offlineDb = {
     allChronological.forEach((entry) => {
       runningBalance = runningBalance + entry.credit - entry.debit;
       entries.push({
-        id: entry.id,
-        purchaseId: entry.purchaseId,
+        ...entry,
+        id: entry.id || entry.purchaseId,
+        purchaseId: entry.purchaseId || entry.id,
         date: entry.date,
         type: entry.type,
         notes: entry.notes,
@@ -542,11 +568,11 @@ export const offlineDb = {
         debit: entry.debit,
         balance: runningBalance,
         referenceId: entry.referenceId,
-        items: entry.items,
-        transport: entry.transport,
-        labour: entry.labour,
-        badGoods: entry.badGoods,
-        paidNow: entry.paidNow,
+        items: entry.items || [],
+        transport: entry.transport || 0,
+        labour: entry.labour || 0,
+        badGoods: entry.badGoods || [],
+        paidNow: entry.paidNow || 0,
         paymentMode: entry.paymentMode,
       });
     });
@@ -857,7 +883,7 @@ export const offlineDb = {
 
   getSale: async (id: number | string) => {
     const sales = getCollection<any>(STORAGE_KEYS.SALES);
-    return sales.find((s) => Number(s.id) === Number(id) || String(s.id) === String(id));
+    return sales.find((s) => Number(s.id) === Number(id) || String(s.id) === String(id) || Number(s.billNo) === Number(id) || String(s.billNo) === String(id));
   },
 
   createSale: async (data: any) => {
@@ -963,7 +989,7 @@ export const offlineDb = {
 
   updateSale: async (id: number | string, data: any) => {
     const sales = getCollection<any>(STORAGE_KEYS.SALES);
-    const idx = sales.findIndex((s) => Number(s.id) === Number(id) || String(s.id) === String(id));
+    const idx = sales.findIndex((s) => Number(s.id) === Number(id) || String(s.id) === String(id) || Number(s.billNo) === Number(id) || String(s.billNo) === String(id));
     if (idx !== -1) {
       const existing = sales[idx];
       const items = (data.items || existing.items || []).map((it: any, i: number) => {

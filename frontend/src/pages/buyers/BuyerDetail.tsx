@@ -521,9 +521,10 @@ export const BuyerDetail: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
+                  const billId = selectedBillDetail.saleId || selectedBillDetail.id || selectedBillDetail.billNo;
                   setSelectedBillDetail(null);
-                  if (selectedBillDetail.saleId) {
-                    navigate(`/sales/${selectedBillDetail.saleId}/edit`);
+                  if (billId) {
+                    navigate(`/sales/${billId}`);
                   }
                 }}
                 className="flex-1 bg-white hover:bg-gray-100 text-[#1F6B45] border border-[#1F6B45] font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
