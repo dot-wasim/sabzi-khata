@@ -74,17 +74,14 @@ export const Login: React.FC = () => {
         return;
       }
 
-      // 4. General / Default login fallback
-      // If user typed 'father' or any custom ID
+      // Default login fallback
       const data = await apiLogin(rawId, rawPass || '123456');
       login(data.token, data.user);
 
       if (rawPass === '1234' || data.user.role === 'OWNER') {
         unlockBoss();
-        navigate('/');
-      } else {
-        navigate('/sales');
       }
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'लॉगिन विफल (Login failed). कृपया दोबारा प्रयास करें।');
     } finally {

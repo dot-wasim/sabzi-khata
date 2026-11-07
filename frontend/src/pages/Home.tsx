@@ -106,13 +106,13 @@ export const Home: React.FC = () => {
   return (
     <div className="s">
       <div className="r">
-        <h1 className="h">Hussain Foods</h1>
+        <h1 className="h">Dashboard</h1>
         <span className="m">{todayStr}</span>
       </div>
 
       {/* Sell Desk Card */}
       <div className="c">
-        <b>Sell Desk</b>
+        <b>Bill & Sales</b>
         <div className="r">
           <span>Today’s bills</span>
           <b>
@@ -126,15 +126,15 @@ export const Home: React.FC = () => {
         <button
           type="button"
           className="b"
-          onClick={() => navigate('/sales')}
+          onClick={() => navigate('/sales/new')}
         >
-          Open Sell Desk
+          + Make Daily Bill
         </button>
       </div>
 
       {/* Buy Desk Card */}
       <div className="c">
-        <b>Buy Desk</b>
+        <b>Accounts & Ledger</b>
         <div className="r">
           <span>Today’s purchases</span>
           <b>
@@ -148,48 +148,29 @@ export const Home: React.FC = () => {
         <button
           type="button"
           className="b"
-          onClick={() => navigate('/purchases')}
+          onClick={() => navigate('/buyers')}
         >
-          Open Buy Desk
+          Open Accounts
         </button>
       </div>
 
       {/* Boss Desk Card */}
       <div className="c">
         <div className="r">
-          <b>Boss Desk</b>
+          <b>Vegetables & Rates</b>
           {isBossUnlocked && <span className="m text-emerald-700 font-bold">✓ Unlocked</span>}
         </div>
         <span className="m">
-          Profit, costs and every report. Locked: enter the 4-digit PIN.
+          Daily crate weights, rate list and profit reports.
         </span>
 
-        {!isBossUnlocked ? (
-          <form onSubmit={handlePinSubmit} className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <input
-                type="password"
-                maxLength={4}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                placeholder="4-digit PIN"
-                className="flex-1 min-h-[44px] border border-[#DDE3D6] rounded-[10px] px-3 font-semibold text-center tracking-widest text-lg bg-white"
-              />
-              <button type="submit" className="b b2 px-4">
-                Unlock
-              </button>
-            </div>
-            {pinError && <span className="text-xs text-rose-600 font-semibold">{pinError}</span>}
-          </form>
-        ) : (
-          <button
-            type="button"
-            className="b b2"
-            onClick={() => navigate('/boss')}
-          >
-            Open Boss Desk
-          </button>
-        )}
+        <button
+          type="button"
+          className="b b2"
+          onClick={() => navigate('/vegetables')}
+        >
+          Manage Vegetables & Crates
+        </button>
       </div>
 
       {/* Safety & Offline Card */}

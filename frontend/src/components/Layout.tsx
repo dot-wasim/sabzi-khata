@@ -5,10 +5,10 @@ import { useBossAuth } from '../context/BossAuthContext';
 import { useSimulator } from '../context/SimulatorContext';
 import { offlineDb } from '../storage/offlineDb';
 import {
-  Home,
-  ShoppingBag,
-  Truck,
-  Shield,
+  LayoutDashboard,
+  Receipt,
+  Users,
+  Carrot,
   CloudCheck
 } from 'lucide-react';
 
@@ -54,44 +54,49 @@ export const Layout: React.FC = () => {
         style={{ transform: 'translateZ(0)' }}
       >
         <div className="grid grid-cols-5 h-14">
+          {/* 1. Dashboard (Old Home) */}
           <NavLink to="/" end className={getMobileBottomItemClass()}>
-            <Home className="w-5 h-5 mb-0.5" />
-            <span>Home</span>
+            <LayoutDashboard className="w-5 h-5 mb-0.5" />
+            <span>Dashboard</span>
           </NavLink>
 
+          {/* 2. Bill (Old Sell Desk) */}
           <NavLink
-            to="/sales"
+            to="/sales/new"
             className={({ isActive }) =>
               `flex flex-col items-center justify-center py-2 px-1 text-[11px] font-semibold transition-all ${
-                isActive || location.pathname.startsWith('/buyers')
+                isActive || location.pathname.startsWith('/sales')
                   ? 'text-[#1F6B45] font-bold'
                   : 'text-[#4D5C50] hover:text-[#1B2A1F]'
               }`
             }
           >
-            <ShoppingBag className="w-5 h-5 mb-0.5" />
-            <span>Sell Desk</span>
+            <Receipt className="w-5 h-5 mb-0.5" />
+            <span>Bill</span>
           </NavLink>
 
+          {/* 3. Accounts (Old Buy Desk) */}
           <NavLink
-            to="/purchases"
+            to="/buyers"
             className={({ isActive }) =>
               `flex flex-col items-center justify-center py-2 px-1 text-[11px] font-semibold transition-all ${
-                isActive || location.pathname.startsWith('/sellers')
+                isActive || location.pathname.startsWith('/buyers') || location.pathname.startsWith('/sellers') || location.pathname.startsWith('/purchases')
                   ? 'text-[#1F6B45] font-bold'
                   : 'text-[#4D5C50] hover:text-[#1B2A1F]'
               }`
             }
           >
-            <Truck className="w-5 h-5 mb-0.5" />
-            <span>Buy Desk</span>
+            <Users className="w-5 h-5 mb-0.5" />
+            <span>Accounts</span>
           </NavLink>
 
-          <NavLink to="/boss" className={getMobileBottomItemClass()}>
-            <Shield className="w-5 h-5 mb-0.5" />
-            <span>Boss Desk</span>
+          {/* 4. Vegetable (Old Boss Desk) */}
+          <NavLink to="/vegetables" className={getMobileBottomItemClass()}>
+            <Carrot className="w-5 h-5 mb-0.5" />
+            <span>Vegetable</span>
           </NavLink>
 
+          {/* 5. Backup */}
           <NavLink to="/settings/backup" className={getMobileBottomItemClass()}>
             <CloudCheck className="w-5 h-5 mb-0.5" />
             <span>Backup</span>
