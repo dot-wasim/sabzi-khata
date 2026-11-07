@@ -1176,9 +1176,9 @@ export const offlineDb = {
     return { purchases: purchases.reverse(), pagination: { total: purchases.length } };
   },
 
-  getPurchase: async (id: number) => {
+  getPurchase: async (id: number | string) => {
     const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES);
-    return purchases.find((p) => p.id === id);
+    return purchases.find((p) => Number(p.id) === Number(id) || String(p.id) === String(id) || Number(p.entryNo) === Number(id) || String(p.entryNo) === String(id));
   },
 
   createPurchase: async (data: any) => {
@@ -1279,6 +1279,59 @@ export const offlineDb = {
     }
 
     return newPurchase;
+  },
+
+  updatePurchase: async (id: number | string, data: any) => {
+    const purchases = getCollection<any>(STORAGE_KEYS.PURCHASES);
+    const idx = purchases.findIndex((p) => Number(p.id) === Number(id) || String(p.id) === String(id) || Number(p.entryNo) === Number(id) || String(p.entryNo) === String(id));
+    if (idx !== -1) {
+      const existing = purchases[idx];
+      const items = (data.items || existing.items || []).map((it: any, i: number) => {
+        const qty = parseFloat(it.quantity) || 0;
+        const rate = parseFloat(it.rate) || 0;
+        return {
+          id: it.id || (Date.now() + i),
+          vegetableId: it.vegetableId,
+          quantity: qty,
+          unit: it.unit || 'kg',
+          rate,
+          lineTotal: Math.round(qty * rate),
+          crateWeightKg: it.crateWeightKg || (it.unit === 'crate' ? 25 : undefined),
+          convertedKg: it.unit === 'crate' ? qty * (it.crateWeightKg || 25) : qty,
+        };
+      });
+
+      const goodsTotal = items.reduce((sum: number, it: any) => sum + it.lineTotal, 0);
+      const transport = data.transport !== undefined ? data.transport : (data.transportCost !== undefined ? data.transportCost : (existing.transport || existing.transportCost || 0));
+      const labour = data.labour !== undefined ? data.labour : (data.labourCost !== undefined ? data.labourCost : (existing.labour || existing.labourCost || 0));
+      const totalAmount = goodsTotal + transport + labour;
+      const paidAmount = data.paidAmount !== undefined ? data.paidAmount : (data.paidNow !== undefined ? data.paidNow : (existing.paidAmount || existing.paidNow || 0));
+      const balanceDue = Math.max(0, totalAmount - paidAmount);
+
+      purchases[idx] = {
+        ...existing,
+        ...data,
+        items,
+        goodsTotal,
+        totalAmount,
+        finalAmount: totalAmount,
+        transport,
+        transportCost: transport,
+        labour,
+        labourCost: labour,
+        paidAmount,
+        paidNow: paidAmount,
+        balanceDue,
+        updatedAt: new Date().toISOString(),
+      };
+      saveCollection(STORAGE_KEYS.PURCHASES, purchases);
+
+      if (purchases[idx].sellerId) {
+        await offlineDb.getSeller(purchases[idx].sellerId);
+      }
+      return purchases[idx];
+    }
+    return null;
   },
 
   // Expenses & Transportation

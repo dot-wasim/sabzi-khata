@@ -330,7 +330,22 @@ export const BuyerDetail: React.FC = () => {
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-right font-black text-[#B4540A] whitespace-nowrap">
-                      ₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>₹{paiseToRupees(entry.runningBalance !== undefined ? entry.runningBalance : (entry.balance || 0)).toLocaleString('en-IN')}</span>
+                        {isSale && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const bId = entry.saleId || entry.id || entry.billNo;
+                              if (bId) navigate(`/sales/${bId}`);
+                            }}
+                            className="text-[11px] font-bold text-[#1F6B45] hover:text-[#185336] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md ml-1"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -369,11 +384,26 @@ export const BuyerDetail: React.FC = () => {
                 <span className="m">
                   {isSale ? 'Amount charged (Tap to view details)' : `Paid via ${entry.paymentMethod || 'cash'}`}
                 </span>
-                <b>
-                  {entry.debit > 0
-                    ? `+₹${paiseToRupees(entry.debit).toLocaleString('en-IN')}`
-                    : `−₹${paiseToRupees(entry.credit).toLocaleString('en-IN')}`}
-                </b>
+                <div className="flex items-center gap-2">
+                  <b>
+                    {entry.debit > 0
+                      ? `+₹${paiseToRupees(entry.debit).toLocaleString('en-IN')}`
+                      : `−₹${paiseToRupees(entry.credit).toLocaleString('en-IN')}`}
+                  </b>
+                  {isSale && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const bId = entry.saleId || entry.id || entry.billNo;
+                        if (bId) navigate(`/sales/${bId}`);
+                      }}
+                      className="text-[11px] font-bold text-[#1F6B45] hover:text-[#185336] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md"
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );

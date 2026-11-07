@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSeller, getSellerLedger, updateSeller } from '../../api/sellers';
+import { getVegetables } from '../../api/vegetables';
 import { createPayment } from '../../api/payments';
 import { SellerModal } from './SellerModal';
 import { formatDate } from '../../utils/date';
 import { paiseToRupees, rupeesToPaise } from '../../utils/currency';
+import { Vegetable } from '../../utils/types';
 
 export const SellerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,9 +15,11 @@ export const SellerDetail: React.FC = () => {
 
   const [data, setData] = useState<any>(null);
   const [ledger, setLedger] = useState<any>(null);
+  const [vegetables, setVegetables] = useState<Vegetable[]>([]);
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [showPaymentBox, setShowPaymentBox] = useState(false);
+  const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState<any>(null);
 
   const [paymentAmountRupees, setPaymentAmountRupees] = useState('');
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'UPI' | 'BANK'>('CASH');
@@ -25,12 +29,14 @@ export const SellerDetail: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sellerRes, ledgerRes] = await Promise.all([
+      const [sellerRes, ledgerRes, vegRes] = await Promise.all([
         getSeller(sellerId),
         getSellerLedger(sellerId),
+        getVegetables().catch(() => []),
       ]);
       setData(sellerRes);
       setLedger(ledgerRes);
+      setVegetables(vegRes);
     } catch (err) {
       console.error('Failed to load seller detail:', err);
     } finally {
@@ -205,28 +211,197 @@ export const SellerDetail: React.FC = () => {
         ) : (
           ledger?.entries?.map((ent: any, idx: number) => {
             const isPurchase = ent.type === 'PURCHASE';
+            const purchaseId = ent.purchaseId || ent.id;
             return (
-              <div key={idx} className="r border-b border-[#DDE3D6] pb-1.5 last:border-0 last:pb-0">
+              <div
+                key={idx}
+                onClick={() => {
+                  if (isPurchase) {
+                    setSelectedPurchaseDetail(ent);
+                  }
+                }}
+                className={`r border-b border-[#DDE3D6] py-2 last:border-0 last:pb-0 items-center ${
+                  isPurchase ? 'cursor-pointer hover:bg-emerald-50/50 rounded-lg px-1' : ''
+                }`}
+              >
                 <div>
-                  <span className="font-semibold text-xs">
-                    {formatDate(ent.date, 'd MMM')} · {ent.referenceId || (isPurchase ? 'Purchase' : 'Paid')}
-                  </span>
-                  {ent.notes && <span className="m block">{ent.notes}</span>}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-semibold text-xs ${isPurchase ? 'text-[#1F6B45]' : ''}`}>
+                      {formatDate(ent.date, 'd MMM')} · {ent.referenceId || (isPurchase ? 'Purchase' : 'Paid')}
+                    </span>
+                    {isPurchase && (
+                      <span className="text-[10px] bg-emerald-100 text-[#1F6B45] font-bold px-1.5 py-0.2 rounded">
+                        View 👁
+                      </span>
+                    )}
+                  </div>
+                  {ent.notes && <span className="m block text-xs">{ent.notes}</span>}
                 </div>
-                <b>
-                  {ent.credit > 0
-                    ? `+₹${paiseToRupees(ent.credit).toLocaleString('en-IN')}`
-                    : `−₹${paiseToRupees(ent.debit).toLocaleString('en-IN')}`}
-                </b>
+                <div className="flex items-center gap-2">
+                  <b>
+                    {ent.credit > 0
+                      ? `+₹${paiseToRupees(ent.credit).toLocaleString('en-IN')}`
+                      : `−₹${paiseToRupees(ent.debit).toLocaleString('en-IN')}`}
+                  </b>
+                  {isPurchase && purchaseId && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/purchases/${purchaseId}`);
+                      }}
+                      className="text-[11px] font-bold text-[#1F6B45] hover:text-[#185336] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md"
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })
         )}
-        <div className="r border-t border-[#DDE3D6] pt-1">
+        <div className="r border-t border-[#DDE3D6] pt-2">
           <b>Total owed</b>
           <b className="d">₹{currentOwedRupees.toLocaleString('en-IN')}</b>
         </div>
       </div>
+
+      {/* Purchase Details Modal */}
+      {selectedPurchaseDetail && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#F6F7F2] border-2 border-[#1F6B45] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-[#DDE3D6] pb-3">
+              <div>
+                <span className="text-xs font-bold text-[#1F6B45] uppercase tracking-wider">Hussain Foods · Purchase Details</span>
+                <h2 className="text-lg font-black text-[#1B2A1F]">
+                  {selectedPurchaseDetail.referenceId ? `Entry #${selectedPurchaseDetail.referenceId}` : 'Purchase'} · {seller.name}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  तारीख: {formatDate(selectedPurchaseDetail.date, 'd MMMM yyyy')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPurchaseDetail(null)}
+                className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Produce Line Items */}
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-gray-700">सब्ज़ियों का विवरण (Produce Items):</span>
+              <div className="bg-white rounded-xl border border-[#DDE3D6] overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-[#E8EDE2] text-[#1B2A1F] font-bold">
+                    <tr>
+                      <th className="px-3 py-2">आइटम</th>
+                      <th className="px-2 py-2 text-center">वज़न / Unit</th>
+                      <th className="px-2 py-2 text-right">रेट</th>
+                      <th className="px-3 py-2 text-right">रकम</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#DDE3D6]">
+                    {selectedPurchaseDetail.items && selectedPurchaseDetail.items.length > 0 ? (
+                      selectedPurchaseDetail.items.map((it: any, i: number) => {
+                        const veg = vegetables.find((v) => v.id === Number(it.vegetableId));
+                        const nameEn = it.nameEn || it.vegetableName || veg?.nameEn || 'Item';
+                        const nameHi = it.nameHi || veg?.nameHi ? ` (${it.nameHi || veg?.nameHi})` : '';
+                        const rateRupees = paiseToRupees(it.rate || 0);
+                        const lineTotalRupees = paiseToRupees(it.lineTotal || (it.quantity * it.rate));
+
+                        return (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-semibold text-[#1B2A1F]">
+                              {nameEn}{nameHi}
+                            </td>
+                            <td className="px-2 py-2 text-center text-gray-600">
+                              {it.quantity} {it.unit || 'kg'}
+                            </td>
+                            <td className="px-2 py-2 text-right font-medium">
+                              ₹{rateRupees}
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-[#1B2A1F]">
+                              ₹{lineTotalRupees.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td className="px-3 py-2.5 font-semibold text-[#1B2A1F]" colSpan={3}>
+                          सब्ज़ियों की खरीद (Produce Purchase)
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold text-[#1B2A1F]">
+                          ₹{paiseToRupees(selectedPurchaseDetail.credit).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Calculations Breakdown */}
+            <div className="bg-white rounded-xl border border-[#DDE3D6] p-3 text-xs space-y-1.5">
+              {(selectedPurchaseDetail.transport > 0 || selectedPurchaseDetail.labour > 0) && (
+                <>
+                  {selectedPurchaseDetail.transport > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>किराया (Transport Cost)</span>
+                      <span>+ ₹{paiseToRupees(selectedPurchaseDetail.transport).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {selectedPurchaseDetail.labour > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>मजदूरी (Labour Cost)</span>
+                      <span>+ ₹{paiseToRupees(selectedPurchaseDetail.labour).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex justify-between text-gray-700 font-bold border-t border-[#DDE3D6] pt-1">
+                <span>कुल खरीद (Total Purchase)</span>
+                <span>₹{paiseToRupees(selectedPurchaseDetail.credit).toLocaleString('en-IN')}</span>
+              </div>
+
+              {selectedPurchaseDetail.paidNow > 0 && (
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span>खरीद के समय नकद दिया (Paid Now)</span>
+                  <span>− ₹{paiseToRupees(selectedPurchaseDetail.paidNow).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const pId = selectedPurchaseDetail.purchaseId || selectedPurchaseDetail.id;
+                  setSelectedPurchaseDetail(null);
+                  if (pId) {
+                    navigate(`/purchases/${pId}`);
+                  }
+                }}
+                className="flex-1 bg-white hover:bg-gray-100 text-[#1F6B45] border border-[#1F6B45] font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                ✏️ बिल एडिट करें (Edit Purchase Bill)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPurchaseDetail(null)}
+                className="flex-1 bg-[#1F6B45] hover:bg-[#185336] text-white font-bold py-2.5 px-3 rounded-xl cursor-pointer text-xs text-center"
+              >
+                बंद करें (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

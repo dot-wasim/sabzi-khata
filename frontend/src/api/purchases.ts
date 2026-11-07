@@ -11,7 +11,7 @@ export async function getPurchases(params?: { page?: number; limit?: number; fro
   }
 }
 
-export async function getPurchase(id: number): Promise<Purchase> {
+export async function getPurchase(id: number | string): Promise<Purchase> {
   try {
     const res = await apiClient.get(`/purchases/${id}`);
     return res.data;
@@ -29,9 +29,13 @@ export async function createPurchase(data: any): Promise<Purchase> {
   }
 }
 
-export async function updatePurchase(id: number, data: any): Promise<Purchase> {
-  const res = await apiClient.put(`/purchases/${id}`, data);
-  return res.data;
+export async function updatePurchase(id: number | string, data: any): Promise<Purchase> {
+  try {
+    const res = await apiClient.put(`/purchases/${id}`, data);
+    return res.data;
+  } catch (err) {
+    return (await offlineDb.updatePurchase(id, data)) as any;
+  }
 }
 
 export async function deletePurchase(id: number): Promise<void> {

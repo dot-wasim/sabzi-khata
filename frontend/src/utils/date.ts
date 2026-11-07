@@ -12,5 +12,10 @@ export function formatDate(dateStr: string | Date | undefined | null, formatPatt
 }
 
 export function toInputDate(date: Date = new Date()): string {
-  return format(date, 'yyyy-MM-dd');
+  try {
+    if (!date || isNaN(date.getTime())) return format(new Date(), 'yyyy-MM-dd');
+    return format(date, 'yyyy-MM-dd');
+  } catch {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
 }
